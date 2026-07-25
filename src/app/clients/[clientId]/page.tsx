@@ -1,368 +1,466 @@
 'use client'
 
-import { useState, useEffect } from 'react'
-import { useParams, useSearchParams } from 'next/navigation'
-import { NavRail, Toaster, AuroraArcStepper, PageHeader, ClientPageHeader, ClientHealthBadge, StageBadge, TaskStatusBadge } from '@/components/shared'
+// Client 360 (PRD §11) — the main operational surface. Everything computed:
+// health/last-contact come from clients_with_health, task status from
+// due_date + completed_at, financial progress from property rows. One query
+// fetches the whole workspace; every mutation invalidates the shared keys
+// so the Tasks page and directory stay in sync (PRD §7.4).
+
+import { useMemo, useState } from 'react'
+import { useParams, useRouter } from 'next/navigation'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { format } from 'date-fns'
 import { toast } from 'sonner'
-import { format, differenceInDays } from 'date-fns'
-import { 
-  Calendar, Clock, DollarSign, Home, AlertTriangle, CheckCircle, 
-  Plus, Trash2, Edit, Mail, Phone, MessageSquare, ChevronDown, ChevronUp,
-  FileText, Building2, Target, TrendingUp
+import {
+  Calendar, Clock, DollarSign, Home, AlertTriangle, CheckCircle, Plus, Trash2,
+  Mail, Phone, MessageSquare, FileText, Building2, Target, TrendingUp, Pencil,
+  CalendarClock, FileWarning, Percent,
 } from 'lucide-react'
-import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { Sheet, SheetTrigger, SheetContent, SheetHeader, SheetTitle, SheetDescription, SheetFooter } from '@/components/ui/sheet'
-import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator } from '@/components/ui/dropdown-menu'
 import { Badge } from '@/components/ui/badge'
-import { Separator } from '@/components/ui/separator'
-import { ScrollArea } from '@/components/ui/scroll-area'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription, SheetFooter } from '@/components/ui/sheet'
+import { NavRail, Breadcrumb, AuroraArcStepper, ClientHealthBadge, StageBadge, TaskStatusBadge } from '@/components/shared'
 import { createClient } from '@/lib/supabase/client'
+import { fetchClient360, invalidateAfterMutation } from '@/lib/data/client-queries'
+import { queryKeys } from '@/lib/data/query-keys'
+import {
+  createNote, deleteNote, createProperty, updateProperty, setPropertyPaidOff, deleteProperty,
+  createTask, setTaskCompleted, deleteTask, updateClientStage, updateClient,
+} from '@/lib/data/mutations'
+import {
+  daysSince, financialProgress, isDueSoon, stagePercent, taskStatus, STAGE_LABELS,
+} from '@/lib/data/domain'
+import type { NoteChannel, PipelineStage, Property } from '@/lib/data/types'
+import { cn } from '@/lib/utils'
 
-interface Client {
-  id: string
-  name: string
-  phone: string
-  email: string
-  state: string
-  zip: string
-  stage: 'consultation' | 'exit_plan' | 'in_progress' | 'resolved'
-  stage_entered_at: string
-  case_opened_at: string
-  last_contact_at: string | null
-  health_status: 'on_track' | 'at_risk' | 'stalled'
-  tags: string[]
+const CHANNEL_META: Record<NoteChannel, { label: string; icon: typeof Mail }> = {
+  email: { label: 'Email', icon: Mail },
+  phone: { label: 'Phone', icon: Phone },
+  text: { label: 'Text', icon: MessageSquare },
 }
 
-interface Property {
-  id: string
-  client_id: string
-  resort_name: string
-  resort_location: string
-  unit_number: string | null
-  purchase_price: number | null
-  loan_balance: number | null
-  maintenance_fee: number | null
-  fee_due_date: string | null
-  paid_off_at: string | null
-  status: 'active' | 'paid_off' | 'foreclosed' | 'relinquished'
-  document_reference: string | null
-  value_eliminated: number | null
+const EMPTY_PROPERTY_FORM = {
+  resort_name: '', resort_location: '', unit_number: '',
+  purchase_price: '', loan_balance: '', maintenance_fee: '',
+  fee_due_date: '', document_reference: '',
 }
-
-interface Note {
-  id: string
-  client_id: string
-  channel: 'call' | 'email' | 'sms' | 'meeting' | 'internal'
-  content: string
-  created_at: string
-  author_id: string
-}
-
-interface Task {
-  id: string
-  client_id: string
-  title: string
-  description: string | null
-  due_date: string
-  due_time: string | null
-  status: 'pending' | 'completed' | 'overdue'
-  completed_at: string | null
-  created_at: string
-}
-
-const STAGE_LABELS = {
-  consultation: 'Consultation',
-  exit_plan: 'Exit Plan',
-  in_progress: 'In Progress',
-  resolved: 'Resolved',
-} as const
-
-const CHANNEL_LABELS = {
-  call: 'Call',
-  email: 'Email',
-  sms: 'SMS',
-  meeting: 'Meeting',
-  internal: 'Internal',
-} as const
-
-const CHANNEL_ICONS = {
-  call: Phone,
-  email: Mail,
-  sms: MessageSquare,
-  meeting: Calendar,
-  internal: FileText,
-} as const
 
 export default function Client360Page() {
   const params = useParams()
-  const searchParams = useSearchParams()
+  const router = useRouter()
   const clientId = params.clientId as string
-  const [client, setClient] = useState<Client | null>(null)
-  const [properties, setProperties] = useState<Property[]>([])
-  const [notes, setNotes] = useState<Note[]>([])
-  const [tasks, setTasks] = useState<Task[]>([])
-  const [loading, setLoading] = useState(true)
-  const [activeSection, setActiveSection] = useState<'overview' | 'properties' | 'notes' | 'tasks'>('overview')
-  const supabase = createClient()
+  const queryClient = useQueryClient()
+  const [supabase] = useState(() => createClient())
 
-  // Sheets state
-  const [addPropertyOpen, setAddPropertyOpen] = useState(false)
-  const [addNoteOpen, setAddNoteOpen] = useState(false)
-  const [addTaskOpen, setAddTaskOpen] = useState(false)
-  const [stageConfirmOpen, setStageConfirmOpen] = useState(false)
-  const [pendingStage, setPendingStage] = useState<string>('')
-
-  // Form state
-  const [newProperty, setNewProperty] = useState({
-    resort_name: '', resort_location: '', unit_number: '',
-    purchase_price: '', loan_balance: '', maintenance_fee: '',
-    fee_due_date: '', document_reference: ''
+  const { data, isLoading, isError, error } = useQuery({
+    queryKey: queryKeys.clients.detail(clientId),
+    queryFn: () => fetchClient360(supabase, clientId),
+    retry: false,
   })
-  const [newNote, setNewNote] = useState({ channel: 'call' as const, content: '' })
-  const [newTask, setNewTask] = useState({ title: '', description: '', due_date: '', due_time: '' })
 
-  useEffect(() => {
-    fetchAllData()
-  }, [clientId])
-
-  const fetchAllData = async () => {
-    setLoading(true)
-    try {
-      const [clientRes, propsRes, notesRes, tasksRes] = await Promise.all([
-        fetch(`/api/clients/${clientId}`),
-        fetch(`/api/clients/${clientId}/properties`),
-        fetch(`/api/notes/${clientId}`),
-        fetch(`/api/tasks?clientId=${clientId}`),
-      ])
-      
-      if (clientRes.ok) setClient((await clientRes.json()).client)
-      if (propsRes.ok) setProperties((await propsRes.json()).properties || [])
-      if (notesRes.ok) setNotes((await notesRes.json()).notes || [])
-      if (tasksRes.ok) setTasks((await tasksRes.json()).tasks || [])
-    } catch (error) {
-      console.error('Failed to fetch client data:', error)
-      toast.error('Failed to load client data')
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  const handleStageClick = (stage: string) => {
-    if (stage !== client?.stage) {
-      setPendingStage(stage)
-      setStageConfirmOpen(true)
-    }
-  }
+  // --- Stage transition (inline confirm, PRD §7.5/§11.5) ---------------------
+  const [pendingStage, setPendingStage] = useState<PipelineStage | null>(null)
+  const [stageSaving, setStageSaving] = useState(false)
 
   const confirmStageChange = async () => {
-    if (!client || !pendingStage) return
+    if (!pendingStage) return
+    setStageSaving(true)
     try {
-      const res = await fetch(`/api/clients/${clientId}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ stage: pendingStage })
-      })
-      if (res.ok) {
-        setClient(prev => prev ? { ...prev, stage: pendingStage as any, stage_entered_at: new Date().toISOString() } : null)
-        toast.success(`Stage updated to ${STAGE_LABELS[pendingStage as keyof typeof STAGE_LABELS]}`)
-      } else {
-        toast.error('Failed to update stage')
-      }
-    } catch {
-      toast.error('Failed to update stage')
+      await updateClientStage(clientId, pendingStage)
+      await invalidateAfterMutation(queryClient, clientId)
+      toast.success(`Stage updated to ${STAGE_LABELS[pendingStage]}`)
+      setPendingStage(null)
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Couldn't update the stage. Try again.")
+    } finally {
+      setStageSaving(false)
     }
-    setStageConfirmOpen(false)
-    setPendingStage('')
   }
 
-  const handleAddProperty = async (e: React.FormEvent) => {
-    e.preventDefault()
+  // --- Notes (inline quick-add, PRD §11.3) -----------------------------------
+  const [noteChannel, setNoteChannel] = useState<NoteChannel>('phone')
+  const [noteContent, setNoteContent] = useState('')
+  const [noteSaving, setNoteSaving] = useState(false)
+
+  const submitNote = async () => {
+    if (!noteContent.trim() || noteSaving) return
+    setNoteSaving(true)
     try {
-      const res = await fetch(`/api/clients/${clientId}/properties`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...newProperty, client_id: clientId })
-      })
-      if (res.ok) {
-        const data = await res.json()
-        setProperties(prev => [data.property, ...prev])
-        setAddPropertyOpen(false)
-        setNewProperty({ resort_name: '', resort_location: '', unit_number: '', purchase_price: '', loan_balance: '', maintenance_fee: '', fee_due_date: '', document_reference: '' })
+      await createNote({ client_id: clientId, channel: noteChannel, content: noteContent.trim() })
+      await invalidateAfterMutation(queryClient, clientId)
+      setNoteContent('')
+      toast.success('Note saved')
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Couldn't save this note. Check your connection and try again.")
+    } finally {
+      setNoteSaving(false)
+    }
+  }
+
+  const handleDeleteNote = async (noteId: string) => {
+    try {
+      await deleteNote(noteId, clientId)
+      await invalidateAfterMutation(queryClient, clientId)
+      toast.success('Note deleted')
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Couldn't delete this note.")
+    }
+  }
+
+  // --- Properties --------------------------------------------------------------
+  const [propertySheetOpen, setPropertySheetOpen] = useState(false)
+  const [editingProperty, setEditingProperty] = useState<Property | null>(null)
+  const [propertyForm, setPropertyForm] = useState(EMPTY_PROPERTY_FORM)
+  const [propertySaving, setPropertySaving] = useState(false)
+  const [payoffProperty, setPayoffProperty] = useState<Property | null>(null)
+  const [payoffValue, setPayoffValue] = useState('')
+
+  const openAddProperty = () => {
+    setEditingProperty(null)
+    setPropertyForm(EMPTY_PROPERTY_FORM)
+    setPropertySheetOpen(true)
+  }
+
+  const openEditProperty = (p: Property) => {
+    setEditingProperty(p)
+    setPropertyForm({
+      resort_name: p.resort_name,
+      resort_location: p.resort_location,
+      unit_number: p.unit_number ?? '',
+      purchase_price: p.purchase_price != null ? String(p.purchase_price) : '',
+      loan_balance: p.loan_balance != null ? String(p.loan_balance) : '',
+      maintenance_fee: p.maintenance_fee != null ? String(p.maintenance_fee) : '',
+      fee_due_date: p.fee_due_date ?? '',
+      document_reference: p.document_reference ?? '',
+    })
+    setPropertySheetOpen(true)
+  }
+
+  const submitProperty = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setPropertySaving(true)
+    const payload = {
+      client_id: clientId,
+      resort_name: propertyForm.resort_name,
+      resort_location: propertyForm.resort_location,
+      unit_number: propertyForm.unit_number || null,
+      purchase_price: propertyForm.purchase_price ? Number(propertyForm.purchase_price) : null,
+      loan_balance: propertyForm.loan_balance ? Number(propertyForm.loan_balance) : null,
+      maintenance_fee: propertyForm.maintenance_fee ? Number(propertyForm.maintenance_fee) : null,
+      fee_due_date: propertyForm.fee_due_date || null,
+      document_reference: propertyForm.document_reference || null,
+    }
+    try {
+      if (editingProperty) {
+        await updateProperty(editingProperty.id, clientId, payload)
+        toast.success('Property updated')
+      } else {
+        await createProperty(payload)
         toast.success('Property added')
-      } else {
-        toast.error('Failed to add property')
       }
-    } catch {
-      toast.error('Failed to add property')
+      await invalidateAfterMutation(queryClient, clientId)
+      setPropertySheetOpen(false)
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Couldn't save this property. Check the details and try again.")
+    } finally {
+      setPropertySaving(false)
     }
   }
 
-  const handleTogglePropertyPaid = async (property: Property) => {
-    const newStatus = property.status === 'paid_off' ? 'active' : 'paid_off'
+  const confirmPayoff = async () => {
+    if (!payoffProperty) return
     try {
-      const res = await fetch(`/api/properties/${property.id}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status: newStatus, paid_off_at: newStatus === 'paid_off' ? new Date().toISOString() : null })
-      })
-      if (res.ok) {
-        setProperties(prev => prev.map(p => p.id === property.id ? { ...p, status: newStatus, paid_off_at: newStatus === 'paid_off' ? new Date().toISOString() : null } : p))
-        toast.success(newStatus === 'paid_off' ? 'Property marked as paid off' : 'Property reactivated')
-      }
-    } catch {
-      toast.error('Failed to update property')
+      await setPropertyPaidOff(
+        payoffProperty.id,
+        clientId,
+        true,
+        payoffValue ? Number(payoffValue) : null
+      )
+      await invalidateAfterMutation(queryClient, clientId)
+      toast.success(`${payoffProperty.resort_name} marked paid off`)
+      setPayoffProperty(null)
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Couldn't update this property.")
     }
   }
 
-  const handleAddNote = async (e: React.FormEvent) => {
+  const handleReactivate = async (p: Property) => {
+    try {
+      await setPropertyPaidOff(p.id, clientId, false)
+      await invalidateAfterMutation(queryClient, clientId)
+      toast.success(`${p.resort_name} reactivated`)
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Couldn't update this property.")
+    }
+  }
+
+  const handleDeleteProperty = async (p: Property) => {
+    try {
+      await deleteProperty(p.id, clientId)
+      await invalidateAfterMutation(queryClient, clientId)
+      toast.success(`${p.resort_name} removed`)
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Couldn't delete this property.")
+    }
+  }
+
+  // --- Tasks (shared record with the Tasks page, PRD §11.4/§7.4) ---------------
+  const [taskTitle, setTaskTitle] = useState('')
+  const [taskDue, setTaskDue] = useState('')
+  const [taskSaving, setTaskSaving] = useState(false)
+
+  const submitTask = async () => {
+    if (!taskTitle.trim() || !taskDue || taskSaving) return
+    setTaskSaving(true)
+    try {
+      await createTask({ client_id: clientId, title: taskTitle.trim(), due_date: taskDue })
+      await invalidateAfterMutation(queryClient, clientId)
+      setTaskTitle('')
+      setTaskDue('')
+      toast.success('Task created — it also appears on the Tasks page')
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Couldn't create this task. Try again.")
+    } finally {
+      setTaskSaving(false)
+    }
+  }
+
+  const handleToggleTask = async (taskId: string, completed: boolean) => {
+    try {
+      await setTaskCompleted(taskId, clientId, completed)
+      await invalidateAfterMutation(queryClient, clientId)
+      toast.success(completed ? 'Task completed' : 'Task reopened')
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Couldn't update this task.")
+    }
+  }
+
+  const handleDeleteTask = async (taskId: string) => {
+    try {
+      await deleteTask(taskId, clientId)
+      await invalidateAfterMutation(queryClient, clientId)
+      toast.success('Task deleted')
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Couldn't delete this task.")
+    }
+  }
+
+  // --- Edit client -------------------------------------------------------------
+  const [editOpen, setEditOpen] = useState(false)
+  const [editForm, setEditForm] = useState({ name: '', phone: '', email: '', state: '', zip: '', tags: '' })
+  const [editSaving, setEditSaving] = useState(false)
+
+  const openEdit = () => {
+    if (!data) return
+    const c = data.client
+    setEditForm({ name: c.name, phone: c.phone, email: c.email, state: c.state, zip: c.zip, tags: c.tags.join(', ') })
+    setEditOpen(true)
+  }
+
+  const submitEdit = async (e: React.FormEvent) => {
     e.preventDefault()
+    setEditSaving(true)
     try {
-      const res = await fetch(`/api/notes/${clientId}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(newNote)
+      await updateClient(clientId, {
+        name: editForm.name,
+        phone: editForm.phone,
+        email: editForm.email,
+        state: editForm.state,
+        zip: editForm.zip,
+        tags: editForm.tags ? editForm.tags.split(',').map((t) => t.trim()).filter(Boolean) : [],
       })
-      if (res.ok) {
-        const data = await res.json()
-        setNotes(prev => [data.note, ...prev])
-        setAddNoteOpen(false)
-        setNewNote({ channel: 'call', content: '' })
-        toast.success('Note added')
-      } else {
-        toast.error('Failed to add note')
-      }
-    } catch {
-      toast.error('Failed to add note')
+      await invalidateAfterMutation(queryClient, clientId)
+      toast.success('Client details updated')
+      setEditOpen(false)
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Couldn't save changes. Check the details and try again.")
+    } finally {
+      setEditSaving(false)
     }
   }
 
-  const handleAddTask = async (e: React.FormEvent) => {
-    e.preventDefault()
-    try {
-      const res = await fetch(`/api/tasks`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...newTask, client_id: clientId })
-      })
-      if (res.ok) {
-        const data = await res.json()
-        setTasks(prev => [...prev, data.task].sort((a, b) => new Date(a.due_date).getTime() - new Date(b.due_date).getTime()))
-        setAddTaskOpen(false)
-        setNewTask({ title: '', description: '', due_date: '', due_time: '' })
-        toast.success('Task created')
-      } else {
-        toast.error('Failed to create task')
-      }
-    } catch {
-      toast.error('Failed to create task')
-    }
-  }
-
-  const handleTaskComplete = async (task: Task) => {
-    const newStatus = task.status === 'completed' ? 'pending' : 'completed'
-    try {
-      const res = await fetch(`/api/tasks/${task.id}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status: newStatus, completed_at: newStatus === 'completed' ? new Date().toISOString() : null })
-      })
-      if (res.ok) {
-        setTasks(prev => prev.map(t => t.id === task.id ? { ...t, status: newStatus, completed_at: newStatus === 'completed' ? new Date().toISOString() : null } : t))
-        toast.success(newStatus === 'completed' ? 'Task completed' : 'Task reopened')
-      }
-    } catch {
-      toast.error('Failed to update task')
-    }
-  }
-
-  if (loading) {
+  // --- Render -------------------------------------------------------------------
+  if (isLoading) {
     return (
       <div className="flex h-screen bg-background">
         <NavRail />
-        <main className="flex-1 ml-16 overflow-auto transition-all duration-200 lg:ml-64">
-          <Toaster />
-          <div className="container mx-auto px-4 py-8 text-center text-muted-foreground">
-            Loading client...
+        <main className="flex-1 ml-16 overflow-auto lg:ml-64">
+          <div className="container mx-auto px-4 py-8 space-y-4">
+            <div className="h-8 w-64 rounded-md bg-muted/60 animate-pulse" />
+            <div className="h-24 rounded-xl bg-muted/60 animate-pulse" />
+            <div className="h-64 rounded-xl bg-muted/60 animate-pulse" />
           </div>
         </main>
       </div>
     )
   }
 
-  if (!client) {
+  if (isError || !data) {
     return (
       <div className="flex h-screen bg-background">
         <NavRail />
-        <main className="flex-1 ml-16 overflow-auto transition-all duration-200 lg:ml-64">
-          <Toaster />
-          <div className="container mx-auto px-4 py-8 text-center">
-            <h1 className="text-2xl font-heading font-semibold">Client not found</h1>
+        <main className="flex-1 ml-16 overflow-auto lg:ml-64">
+          <div className="container mx-auto px-4 py-16 text-center">
+            <h1 className="text-2xl font-heading font-semibold mb-2">Client not found</h1>
+            <p className="text-muted-foreground mb-6">
+              {error instanceof Error ? error.message : "This case may have been deleted, or the link is wrong."}
+            </p>
+            <Button onClick={() => router.push('/clients')}>Back to Clients</Button>
           </div>
         </main>
       </div>
     )
   }
 
-  const daysInStage = differenceInDays(new Date(), new Date(client.stage_entered_at))
-  const totalDays = differenceInDays(new Date(), new Date(client.case_opened_at))
-  const activeProperties = properties.filter(p => p.status === 'active')
-  const paidOffProperties = properties.filter(p => p.status === 'paid_off')
-  const totalDebtEliminated = properties.reduce((sum, p) => sum + (p.value_eliminated || 0), 0)
-  const pendingTasks = tasks.filter(t => t.status === 'pending' || t.status === 'overdue')
-  const overdueTasks = tasks.filter(t => t.status === 'overdue')
+  const { client, properties, notes, tasks } = data
+  const fin = financialProgress(properties)
+  const percentComplete = stagePercent(client.stage)
+  const openTasks = tasks.filter((t) => !t.completed_at)
+  const overdueTasks = openTasks.filter((t) => taskStatus(t) === 'overdue')
+  const docsMissing = properties.filter((p) => !p.document_reference).length
+  const nextFeeDue = properties
+    .filter((p) => p.status === 'active' && p.fee_due_date)
+    .map((p) => p.fee_due_date!)
+    .sort()[0]
 
   return (
     <div className="flex h-screen bg-background">
       <NavRail />
       <main className="flex-1 ml-16 overflow-auto transition-all duration-200 lg:ml-64">
-        <Toaster />
-        
-        <ClientPageHeader
-          clientName={client.name}
-          healthStatus={client.health_status}
-          onBack={() => window.history.back()}
-        />
+        {/* Sticky header (PRD §11.6) */}
+        <header className="sticky top-0 z-30 bg-background/95 backdrop-blur border-b border-border">
+          <div className="container mx-auto px-4 py-3">
+            <Breadcrumb items={[{ label: 'Clients', href: '/clients' }, { label: client.name }]} className="mb-2" />
+            <div className="flex items-center justify-between gap-4 flex-wrap">
+              <div className="flex items-center gap-3 flex-wrap">
+                <h1 className="text-xl md:text-2xl font-heading font-semibold">{client.name}</h1>
+                <ClientHealthBadge status={client.health_status} />
+                <StageBadge stage={client.stage} />
+                {client.tags.map((t) => <Badge key={t} variant="secondary" className="text-xs">{t}</Badge>)}
+              </div>
+              <div className="flex items-center gap-3 text-sm text-muted-foreground">
+                <span className="font-mono">{client.phone}</span>
+                <span className="hidden md:inline">{client.email}</span>
+                <span>{client.state} {client.zip}</span>
+                <Button variant="outline" size="sm" onClick={openEdit}>
+                  <Pencil className="w-3.5 h-3.5 mr-1" />
+                  Edit
+                </Button>
+              </div>
+            </div>
+          </div>
+        </header>
 
-        <div className="container mx-auto px-4 pb-8">
-          {/* Pipeline Stepper */}
-          <div className="mb-6" id="statistics">
+        <div className="container mx-auto px-4 pb-10">
+          {/* Aurora Arc stepper */}
+          <div className="pt-6 pb-2">
             <AuroraArcStepper
               currentStage={client.stage}
-              onStageClick={handleStageClick}
+              onStageClick={(stage) => setPendingStage(stage)}
               variant="full"
             />
+            {pendingStage && (
+              <div className="mt-4 flex items-center justify-between gap-4 rounded-lg border border-primary/30 bg-primary/5 px-4 py-3">
+                <p className="text-sm">
+                  Move <strong>{client.name}</strong> to <strong>{STAGE_LABELS[pendingStage]}</strong>?
+                  The transition will be timestamped and health recalculated.
+                </p>
+                <div className="flex gap-2 flex-shrink-0">
+                  <Button variant="outline" size="sm" onClick={() => setPendingStage(null)} disabled={stageSaving}>Cancel</Button>
+                  <Button size="sm" onClick={confirmStageChange} disabled={stageSaving}>
+                    {stageSaving ? 'Updating…' : 'Confirm'}
+                  </Button>
+                </div>
+              </div>
+            )}
           </div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-[1fr_380px] gap-6">
-            {/* Main Column */}
-            <div className="space-y-6">
-              {/* Case Statistics */}
-              <section id="statistics" className="rounded-xl border bg-card p-6">
+          <div className="grid grid-cols-1 lg:grid-cols-[1fr_380px] gap-6 mt-4">
+            {/* Primary column: statistics → properties → notes (PRD §11.6) */}
+            <div className="space-y-6 min-w-0">
+              {/* §11.1 Case statistics — all computed */}
+              <section id="statistics" className="rounded-xl border bg-card p-6 scroll-mt-24">
                 <h2 className="text-lg font-semibold mb-4">Case Statistics</h2>
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                  <StatCard label="Days in Stage" value={daysInStage} icon={<Clock className="w-5 h-5" />} />
-                  <StatCard label="Total Days Open" value={totalDays} icon={<Calendar className="w-5 h-5" />} />
-                  <StatCard label="Active Properties" value={activeProperties.length} icon={<Home className="w-5 h-5" />} />
-                  <StatCard label="Properties Paid Off" value={paidOffProperties.length} icon={<CheckCircle className="w-5 h-5" />} />
-                  <StatCard label="Debt Eliminated" value={`$${totalDebtEliminated.toLocaleString()}`} icon={<DollarSign className="w-5 h-5" />} />
-                  <StatCard label="Pending Tasks" value={pendingTasks.length} icon={<Target className="w-5 h-5" />} />
-                  <StatCard label="Overdue Tasks" value={overdueTasks.length} icon={<AlertTriangle className="w-5 h-5" />} />
-                  <StatCard label="Last Contact" value={client.last_contact_at ? format(new Date(client.last_contact_at), 'MMM d, yyyy') : 'Never'} icon={<MessageSquare className="w-5 h-5" />} />
+                  <StatCard label="Days in Stage" value={daysSince(client.stage_entered_at)} icon={<Clock className="w-4 h-4" />} />
+                  <StatCard label="Total Days in Process" value={daysSince(client.case_opened_at)} icon={<Calendar className="w-4 h-4" />} />
+                  <StatCard label="Case Opened" value={format(new Date(client.case_opened_at), 'MMM d, yyyy')} icon={<FileText className="w-4 h-4" />} small />
+                  <StatCard
+                    label="Last Contact"
+                    value={client.last_contact_at ? format(new Date(client.last_contact_at), 'MMM d, yyyy') : 'Never'}
+                    icon={<MessageSquare className="w-4 h-4" />}
+                    small
+                  />
+                  <StatCard
+                    label="Next Scheduled Action"
+                    value={client.next_task_due ? format(new Date(client.next_task_due + 'T00:00:00'), 'MMM d, yyyy') : 'None scheduled'}
+                    icon={<CalendarClock className="w-4 h-4" />}
+                    small
+                    warn={!client.next_task_due && client.stage !== 'resolved'}
+                  />
+                  <StatCard label="Open Tasks" value={openTasks.length} icon={<Target className="w-4 h-4" />} />
+                  <StatCard label="Overdue Tasks" value={overdueTasks.length} icon={<AlertTriangle className="w-4 h-4" />} warn={overdueTasks.length > 0} />
+                  <StatCard
+                    label="Next Maintenance Fee"
+                    value={nextFeeDue ? format(new Date(nextFeeDue + 'T00:00:00'), 'MMM d, yyyy') : '—'}
+                    icon={<Home className="w-4 h-4" />}
+                    small
+                  />
+                </div>
+
+                {/* Amount owed vs. eliminated (PRD §11.1) */}
+                <div className="mt-6">
+                  <div className="flex items-center justify-between text-sm mb-2">
+                    <span className="font-medium flex items-center gap-1.5">
+                      <DollarSign className="w-4 h-4 text-muted-foreground" />
+                      Owed vs. Eliminated
+                    </span>
+                    <span className="font-mono tabular-nums text-muted-foreground">
+                      ${fin.eliminated.toLocaleString()} eliminated · ${fin.owed.toLocaleString()} outstanding
+                    </span>
+                  </div>
+                  <div className="h-2.5 rounded-full bg-border overflow-hidden">
+                    <div
+                      className="h-full bg-aurora-arc rounded-full transition-all duration-500"
+                      style={{ width: `${fin.percent}%` }}
+                    />
+                  </div>
+                  <div className="flex justify-between text-xs text-muted-foreground mt-1 font-mono tabular-nums">
+                    <span>{fin.percent}% eliminated</span>
+                    <span className="flex items-center gap-1">
+                      <Percent className="w-3 h-3" />
+                      {percentComplete}% to resolution
+                    </span>
+                  </div>
+                </div>
+
+                <div className="mt-4 flex flex-wrap gap-x-6 gap-y-1 text-sm text-muted-foreground">
+                  <span className="flex items-center gap-1.5">
+                    <FileWarning className="w-4 h-4" />
+                    Documents: {properties.length === 0
+                      ? 'no properties on file'
+                      : docsMissing === 0
+                        ? `on file for all ${properties.length} ${properties.length === 1 ? 'property' : 'properties'}`
+                        : `missing for ${docsMissing} of ${properties.length}`}
+                  </span>
+                  <span className="flex items-center gap-1.5">
+                    <TrendingUp className="w-4 h-4" />
+                    Value eliminated: <span className="font-mono tabular-nums">${fin.eliminated.toLocaleString()}</span>
+                  </span>
                 </div>
               </section>
 
-              {/* Properties */}
-              <section id="properties" className="rounded-xl border bg-card">
+              {/* §11.2 Property records */}
+              <section id="properties" className="rounded-xl border bg-card scroll-mt-24">
                 <div className="p-4 border-b flex items-center justify-between">
                   <h2 className="text-lg font-semibold flex items-center gap-2">
                     <Building2 className="w-5 h-5" />
                     Property Records ({properties.length})
                   </h2>
-                  <Button size="sm" onClick={() => setAddPropertyOpen(true)}>
+                  <Button size="sm" onClick={openAddProperty}>
                     <Plus className="w-4 h-4 mr-1" />
                     Add Property
                   </Button>
@@ -370,76 +468,183 @@ export default function Client360Page() {
                 <div className="divide-y">
                   {properties.length === 0 ? (
                     <div className="p-8 text-center text-muted-foreground">
-                      <p className="mb-2">No properties recorded</p>
-                      <Button size="sm" onClick={() => setAddPropertyOpen(true)}>
+                      <p className="mb-3">No properties recorded yet — most cases start with at least one timeshare.</p>
+                      <Button size="sm" onClick={openAddProperty}>
                         <Plus className="w-4 h-4 mr-1" />
-                        Add First Property
+                        Add the first property
                       </Button>
                     </div>
                   ) : (
-                    properties.map((prop) => (
-                      <PropertyRow key={prop.id} property={prop} onTogglePaid={handleTogglePropertyPaid} />
+                    properties.map((p) => (
+                      <PropertyCard
+                        key={p.id}
+                        property={p}
+                        onEdit={() => openEditProperty(p)}
+                        onStartPayoff={() => { setPayoffProperty(p); setPayoffValue(p.loan_balance != null ? String(p.loan_balance) : '') }}
+                        onReactivate={() => handleReactivate(p)}
+                        onDelete={() => handleDeleteProperty(p)}
+                      />
                     ))
                   )}
                 </div>
               </section>
 
-              {/* Notes */}
-              <section id="notes" className="rounded-xl border bg-card">
-                <div className="p-4 border-b flex items-center justify-between">
+              {/* §11.3 Notes — inline quick-add, newest first */}
+              <section id="notes" className="rounded-xl border bg-card scroll-mt-24">
+                <div className="p-4 border-b">
                   <h2 className="text-lg font-semibold flex items-center gap-2">
                     <FileText className="w-5 h-5" />
-                    Notes & Communication ({notes.length})
+                    Notes &amp; Communication ({notes.length})
                   </h2>
-                  <Button size="sm" onClick={() => setAddNoteOpen(true)}>
-                    <Plus className="w-4 h-4 mr-1" />
-                    Add Note
-                  </Button>
+                </div>
+                <div className="p-4 border-b bg-muted/20">
+                  <div className="flex gap-2">
+                    <Select value={noteChannel} onValueChange={(v) => setNoteChannel(v as NoteChannel)}>
+                      <SelectTrigger className="w-[130px]" aria-label="Note channel">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {Object.entries(CHANNEL_META).map(([k, m]) => (
+                          <SelectItem key={k} value={k}>{m.label}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <Textarea
+                      value={noteContent}
+                      onChange={(e) => setNoteContent(e.target.value)}
+                      onKeyDown={(e) => { if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') submitNote() }}
+                      placeholder={`Log a ${CHANNEL_META[noteChannel].label.toLowerCase()} with ${client.name}… (Ctrl+Enter to save)`}
+                      rows={2}
+                      className="flex-1"
+                    />
+                    <Button onClick={submitNote} disabled={noteSaving || !noteContent.trim()} className="self-end">
+                      {noteSaving ? 'Saving…' : 'Save Note'}
+                    </Button>
+                  </div>
                 </div>
                 <div className="divide-y">
                   {notes.length === 0 ? (
                     <div className="p-8 text-center text-muted-foreground">
-                      <p className="mb-2">No notes yet</p>
-                      <Button size="sm" onClick={() => setAddNoteOpen(true)}>
-                        <Plus className="w-4 h-4 mr-1" />
-                        Add First Note
-                      </Button>
+                      No notes yet. Log the first contact above — every touch counts toward this case&apos;s health.
                     </div>
                   ) : (
-                    notes.map((note) => (
-                      <NoteRow key={note.id} note={note} />
-                    ))
+                    notes.map((note) => {
+                      const meta = CHANNEL_META[note.channel]
+                      return (
+                        <div key={note.id} className="p-4 hover:bg-muted/30 transition-colors group">
+                          <div className="flex items-start gap-3">
+                            <div className="flex-shrink-0 w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
+                              <meta.icon className="w-4 h-4 text-primary" />
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-2 mb-1">
+                                <Badge variant="outline" className="text-xs">{meta.label}</Badge>
+                                <span className="text-xs text-muted-foreground font-mono">
+                                  {format(new Date(note.created_at), 'MMM d, yyyy h:mm a')}
+                                </span>
+                                <button
+                                  onClick={() => handleDeleteNote(note.id)}
+                                  className="ml-auto opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-red-600 transition-all"
+                                  aria-label="Delete note"
+                                  title="Delete note"
+                                >
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                </button>
+                              </div>
+                              <p className="text-sm whitespace-pre-wrap">{note.content}</p>
+                            </div>
+                          </div>
+                        </div>
+                      )
+                    })
                   )}
                 </div>
               </section>
             </div>
 
-            {/* Sticky Right Column - Tasks */}
-            <div className="hidden lg:block sticky top-20 space-y-6" id="tasks">
-              <section className="rounded-xl border bg-card">
+            {/* §11.4 Tasks & Appointments — persistent right column */}
+            <div className="min-w-0">
+              <section id="tasks" className="rounded-xl border bg-card lg:sticky lg:top-24 scroll-mt-24">
                 <div className="p-4 border-b flex items-center justify-between">
                   <h2 className="text-lg font-semibold flex items-center gap-2">
                     <Target className="w-5 h-5" />
-                    Tasks & Appointments ({tasks.length})
+                    Tasks &amp; Appointments
                   </h2>
-                  <Button size="sm" onClick={() => setAddTaskOpen(true)}>
-                    <Plus className="w-4 h-4 mr-1" />
-                    Add Task
+                  <Button variant="ghost" size="sm" onClick={() => router.push(`/tasks?client=${clientId}`)}>
+                    Open in Tasks →
                   </Button>
                 </div>
-                <div className="divide-y">
+
+                {/* Inline quick-add */}
+                <div className="p-3 border-b bg-muted/20 space-y-2">
+                  <Input
+                    value={taskTitle}
+                    onChange={(e) => setTaskTitle(e.target.value)}
+                    onKeyDown={(e) => { if (e.key === 'Enter') submitTask() }}
+                    placeholder="Follow up on…"
+                    aria-label="New task title"
+                  />
+                  <div className="flex gap-2">
+                    <Input
+                      type="date"
+                      value={taskDue}
+                      onChange={(e) => setTaskDue(e.target.value)}
+                      aria-label="New task due date"
+                      className="flex-1"
+                    />
+                    <Button onClick={submitTask} disabled={taskSaving || !taskTitle.trim() || !taskDue}>
+                      <Plus className="w-4 h-4 mr-1" />
+                      Add
+                    </Button>
+                  </div>
+                </div>
+
+                <div className="divide-y max-h-[520px] overflow-y-auto">
                   {tasks.length === 0 ? (
                     <div className="p-8 text-center text-muted-foreground">
-                      <p className="mb-2">Nothing due today. Add a task to keep this case moving.</p>
-                      <Button size="sm" onClick={() => setAddTaskOpen(true)}>
-                        <Plus className="w-4 h-4 mr-1" />
-                        Add Task
-                      </Button>
+                      Nothing due today. Add a task to keep this case moving.
                     </div>
                   ) : (
-                    tasks.map((task) => (
-                      <TaskRow key={task.id} task={task} onComplete={handleTaskComplete} />
-                    ))
+                    tasks.map((task) => {
+                      const status = taskStatus(task)
+                      return (
+                        <div key={task.id} className={cn('p-3 hover:bg-muted/30 transition-colors group', status === 'completed' && 'opacity-60')}>
+                          <div className="flex items-start gap-2.5">
+                            <button
+                              onClick={() => handleToggleTask(task.id, status !== 'completed')}
+                              className="mt-0.5 flex-shrink-0"
+                              aria-label={status === 'completed' ? 'Reopen task' : 'Complete task'}
+                            >
+                              {status === 'completed'
+                                ? <CheckCircle className="w-4.5 h-4.5 w-5 h-5 text-green-600" />
+                                : <span className="block w-4 h-4 rounded border border-muted-foreground/50 hover:border-primary transition-colors" />}
+                            </button>
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <span className={cn('font-medium text-sm', status === 'completed' && 'line-through')}>{task.title}</span>
+                                <TaskStatusBadge status={status} dueSoon={isDueSoon(task)} />
+                              </div>
+                              <div className="flex items-center gap-2 text-xs text-muted-foreground mt-0.5">
+                                <span className={cn('flex items-center gap-1 font-mono', status === 'overdue' && 'text-red-600 font-medium')}>
+                                  <Calendar className="w-3 h-3" />
+                                  {format(new Date(task.due_date + 'T00:00:00'), 'MMM d, yyyy')}
+                                </span>
+                                {task.due_time && <span className="flex items-center gap-1 font-mono"><Clock className="w-3 h-3" />{task.due_time.slice(0, 5)}</span>}
+                                <button
+                                  onClick={() => handleDeleteTask(task.id)}
+                                  className="ml-auto opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-red-600 transition-all"
+                                  aria-label="Delete task"
+                                  title="Delete task"
+                                >
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                </button>
+                              </div>
+                              {task.description && <p className="text-xs text-muted-foreground mt-1 line-clamp-2">{task.description}</p>}
+                            </div>
+                          </div>
+                        </div>
+                      )
+                    })
                   )}
                 </div>
               </section>
@@ -447,269 +652,209 @@ export default function Client360Page() {
           </div>
         </div>
 
-        {/* Sheets */}
-        <StageConfirmSheet open={stageConfirmOpen} onOpenChange={setStageConfirmOpen} pendingStage={pendingStage} onConfirm={confirmStageChange} clientName={client.name} />
-        <AddPropertySheet open={addPropertyOpen} onOpenChange={setAddPropertyOpen} form={newProperty} setForm={setNewProperty} onSubmit={handleAddProperty} />
-        <AddNoteSheet open={addNoteOpen} onOpenChange={setAddNoteOpen} form={newNote} setForm={setNewNote} onSubmit={handleAddNote} />
-        <AddTaskSheet open={addTaskOpen} onOpenChange={setAddTaskOpen} form={newTask} setForm={setNewTask} onSubmit={handleAddTask} />
+        {/* Add/Edit Property sheet */}
+        <Sheet open={propertySheetOpen} onOpenChange={setPropertySheetOpen}>
+          <SheetContent side="right" className="w-full max-w-md overflow-y-auto">
+            <SheetHeader>
+              <SheetTitle>{editingProperty ? 'Edit Property' : 'Add Property'}</SheetTitle>
+              <SheetDescription>A timeshare or fractional interest tied to this case.</SheetDescription>
+            </SheetHeader>
+            <form onSubmit={submitProperty} className="space-y-4 p-4">
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Resort Name *</label>
+                <Input value={propertyForm.resort_name} onChange={(e) => setPropertyForm({ ...propertyForm, resort_name: e.target.value })} required />
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Resort Location *</label>
+                <Input value={propertyForm.resort_location} onChange={(e) => setPropertyForm({ ...propertyForm, resort_location: e.target.value })} required />
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Unit / Title Number</label>
+                <Input value={propertyForm.unit_number} onChange={(e) => setPropertyForm({ ...propertyForm, unit_number: e.target.value })} />
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Purchase Price</label>
+                  <Input type="number" step="0.01" min="0" value={propertyForm.purchase_price} onChange={(e) => setPropertyForm({ ...propertyForm, purchase_price: e.target.value })} />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Amount Owed (Loan Balance)</label>
+                  <Input type="number" step="0.01" min="0" value={propertyForm.loan_balance} onChange={(e) => setPropertyForm({ ...propertyForm, loan_balance: e.target.value })} />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Maintenance Fee</label>
+                  <Input type="number" step="0.01" min="0" value={propertyForm.maintenance_fee} onChange={(e) => setPropertyForm({ ...propertyForm, maintenance_fee: e.target.value })} />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Fee Due Date</label>
+                  <Input type="date" value={propertyForm.fee_due_date} onChange={(e) => setPropertyForm({ ...propertyForm, fee_due_date: e.target.value })} />
+                </div>
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Document / Contract Reference (link)</label>
+                <Input value={propertyForm.document_reference} onChange={(e) => setPropertyForm({ ...propertyForm, document_reference: e.target.value })} placeholder="https://…" />
+              </div>
+              <SheetFooter>
+                <Button type="submit" className="w-full" disabled={propertySaving}>
+                  {propertySaving ? 'Saving…' : editingProperty ? 'Save Changes' : 'Add Property'}
+                </Button>
+              </SheetFooter>
+            </form>
+          </SheetContent>
+        </Sheet>
+
+        {/* Paid-off confirm (value eliminated) */}
+        <Sheet open={!!payoffProperty} onOpenChange={(open) => !open && setPayoffProperty(null)}>
+          <SheetContent side="right" className="w-full max-w-sm">
+            <SheetHeader>
+              <SheetTitle>Mark {payoffProperty?.resort_name} paid off?</SheetTitle>
+              <SheetDescription>
+                The eliminated value feeds the dashboard&apos;s debt-eliminated metric. It defaults to the loan balance — adjust if needed.
+              </SheetDescription>
+            </SheetHeader>
+            <div className="p-4 space-y-4">
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Value Eliminated ($)</label>
+                <Input type="number" step="0.01" min="0" value={payoffValue} onChange={(e) => setPayoffValue(e.target.value)} />
+              </div>
+              <SheetFooter className="flex-row gap-2">
+                <Button variant="outline" className="flex-1" onClick={() => setPayoffProperty(null)}>Cancel</Button>
+                <Button className="flex-1" onClick={confirmPayoff}>Mark Paid Off</Button>
+              </SheetFooter>
+            </div>
+          </SheetContent>
+        </Sheet>
+
+        {/* Edit client sheet */}
+        <Sheet open={editOpen} onOpenChange={setEditOpen}>
+          <SheetContent side="right" className="w-full max-w-md overflow-y-auto">
+            <SheetHeader>
+              <SheetTitle>Edit Client</SheetTitle>
+              <SheetDescription>Contact details and tags for {client.name}.</SheetDescription>
+            </SheetHeader>
+            <form onSubmit={submitEdit} className="space-y-4 p-4">
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Full Name *</label>
+                <Input value={editForm.name} onChange={(e) => setEditForm({ ...editForm, name: e.target.value })} required />
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Phone *</label>
+                <Input type="tel" value={editForm.phone} onChange={(e) => setEditForm({ ...editForm, phone: e.target.value })} required />
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Email *</label>
+                <Input type="email" value={editForm.email} onChange={(e) => setEditForm({ ...editForm, email: e.target.value })} required />
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">State *</label>
+                  <Input value={editForm.state} onChange={(e) => setEditForm({ ...editForm, state: e.target.value.toUpperCase() })} required maxLength={2} />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">ZIP *</label>
+                  <Input value={editForm.zip} onChange={(e) => setEditForm({ ...editForm, zip: e.target.value })} required maxLength={10} />
+                </div>
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Tags</label>
+                <Input value={editForm.tags} onChange={(e) => setEditForm({ ...editForm, tags: e.target.value })} placeholder="VIP, Referral — comma separated" />
+              </div>
+              <SheetFooter>
+                <Button type="submit" className="w-full" disabled={editSaving}>
+                  {editSaving ? 'Saving…' : 'Save Changes'}
+                </Button>
+              </SheetFooter>
+            </form>
+          </SheetContent>
+        </Sheet>
       </main>
     </div>
   )
 }
 
-// Helper Components
-function StatCard({ label, value, icon }: { label: string; value: string | number; icon: React.ReactNode }) {
+function StatCard({
+  label, value, icon, small = false, warn = false,
+}: {
+  label: string
+  value: string | number
+  icon: React.ReactNode
+  small?: boolean
+  warn?: boolean
+}) {
   return (
-    <div className="p-4 rounded-lg border bg-muted/30">
-      <div className="flex items-center gap-2 text-muted-foreground text-sm mb-1">
+    <div className={cn('p-4 rounded-lg border', warn ? 'border-amber-300 bg-amber-50' : 'bg-muted/30')}>
+      <div className={cn('flex items-center gap-2 text-sm mb-1', warn ? 'text-amber-800' : 'text-muted-foreground')}>
         {icon}
         <span>{label}</span>
       </div>
-      <p className="text-2xl font-bold font-mono tabular-nums">{value}</p>
+      <p className={cn('font-bold font-mono tabular-nums', small ? 'text-lg' : 'text-2xl', warn && 'text-amber-900')}>{value}</p>
     </div>
   )
 }
 
-function PropertyRow({ property, onTogglePaid }: { property: Property; onTogglePaid: (p: Property) => void }) {
-  const isPaid = property.status === 'paid_off'
+function PropertyCard({
+  property: p, onEdit, onStartPayoff, onReactivate, onDelete,
+}: {
+  property: Property
+  onEdit: () => void
+  onStartPayoff: () => void
+  onReactivate: () => void
+  onDelete: () => void
+}) {
+  const isPaid = p.status === 'paid_off'
   return (
-    <div className="p-4 hover:bg-muted/30 transition-colors">
+    <div className={cn('p-4 hover:bg-muted/30 transition-colors group', isPaid && 'bg-green-50/40')}>
       <div className="flex items-start justify-between gap-4">
         <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2 mb-1">
-            <span className="font-medium">{property.resort_name}</span>
+          <div className="flex items-center gap-2 flex-wrap mb-1">
+            <span className="font-medium">{p.resort_name}</span>
             <Badge variant="outline" className={cn(
-              isPaid && 'bg-green-100 text-green-800 border-green-200',
-              !isPaid && 'bg-blue-100 text-blue-800 border-blue-200'
+              isPaid ? 'bg-green-100 text-green-800 border-green-200' : 'bg-blue-100 text-blue-800 border-blue-200'
             )}>
-              {property.status.replace('_', ' ')}
+              {isPaid ? 'Paid Off' : p.status.replace('_', ' ')}
             </Badge>
+            {!p.document_reference ? (
+              <Badge variant="outline" className="bg-amber-100 text-amber-800 border-amber-200">Doc missing</Badge>
+            ) : (
+              <a href={p.document_reference} target="_blank" rel="noreferrer" className="text-xs text-primary hover:underline flex items-center gap-1">
+                <FileText className="w-3 h-3" /> Contract
+              </a>
+            )}
           </div>
-          <p className="text-sm text-muted-foreground">{property.resort_location}</p>
-          {property.unit_number && <p className="text-sm text-muted-foreground">Unit: {property.unit_number}</p>}
-          <div className="flex flex-wrap gap-4 mt-2 text-sm text-muted-foreground">
-            {property.loan_balance !== null && <span><DollarSign className="w-3 h-3 inline mr-1" /> Balance: ${Number(property.loan_balance).toLocaleString()}</span>}
-            {property.maintenance_fee !== null && <span><Home className="w-3 h-3 inline mr-1" /> Maint: ${Number(property.maintenance_fee).toLocaleString()}</span>}
-            {property.fee_due_date && <span><Calendar className="w-3 h-3 inline mr-1" /> Due: {format(new Date(property.fee_due_date), 'MMM d, yyyy')}</span>}
+          <p className="text-sm text-muted-foreground">
+            {p.resort_location}{p.unit_number ? ` · Unit ${p.unit_number}` : ''}
+          </p>
+          <div className="flex flex-wrap gap-x-4 gap-y-1 mt-2 text-sm text-muted-foreground font-mono tabular-nums">
+            {p.loan_balance != null && <span>Owed: ${Number(p.loan_balance).toLocaleString()}</span>}
+            {isPaid && p.value_eliminated != null && (
+              <span className="text-green-700">Eliminated: ${Number(p.value_eliminated).toLocaleString()}</span>
+            )}
+            {p.maintenance_fee != null && (
+              <span>
+                Maint: ${Number(p.maintenance_fee).toLocaleString()}
+                {p.fee_due_date ? ` · due ${format(new Date(p.fee_due_date + 'T00:00:00'), 'MMM d, yyyy')}` : ''}
+              </span>
+            )}
           </div>
         </div>
-        <Button
-          variant={isPaid ? 'secondary' : 'default'}
-          size="sm"
-          onClick={() => onTogglePaid(property)}
-        >
-          {isPaid ? 'Reactivate' : 'Mark Paid Off'}
-        </Button>
-      </div>
-    </div>
-  )
-}
-
-function NoteRow({ note }: { note: Note }) {
-  const Icon = CHANNEL_ICONS[note.channel]
-  return (
-    <div className="p-4 hover:bg-muted/30 transition-colors">
-      <div className="flex items-start gap-3">
-        <div className="flex-shrink-0 w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
-          <Icon className="w-4 h-4 text-primary" />
-        </div>
-        <div className="flex-1">
-          <div className="flex items-center gap-2 mb-1">
-            <Badge variant="outline" className="text-xs">
-              {CHANNEL_LABELS[note.channel]}
-            </Badge>
-            <span className="text-xs text-muted-foreground font-mono">
-              {format(new Date(note.created_at), 'MMM d, yyyy h:mm a')}
-            </span>
-          </div>
-          <p className="text-sm whitespace-pre-wrap">{note.content}</p>
-        </div>
-      </div>
-    </div>
-  )
-}
-
-function TaskRow({ task, onComplete }: { task: Task; onComplete: (t: Task) => void }) {
-  const isOverdue = task.status === 'overdue' || (task.status === 'pending' && new Date(task.due_date) < new Date())
-  const status = isOverdue ? 'overdue' : task.status
-  
-  return (
-    <div className="p-4 hover:bg-muted/30 transition-colors">
-      <div className="flex items-start gap-3">
-        <Button
-          variant="ghost"
-          size="icon"
-          className="mt-1 h-6 w-6"
-          onClick={() => onComplete(task)}
-        >
-          {status === 'completed' ? (
-            <CheckCircle className="w-4 h-4 text-green-500" />
+        <div className="flex items-center gap-1.5 flex-shrink-0">
+          {/* PRD §11.2: paid-off as a clickable Yes/No toggle */}
+          {isPaid ? (
+            <Button variant="secondary" size="sm" onClick={onReactivate}>Reactivate</Button>
           ) : (
-            <div className="w-4 h-4 border rounded" />
+            <Button size="sm" onClick={onStartPayoff}>Mark Paid Off</Button>
           )}
-        </Button>
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2 mb-1">
-            <span className="font-medium text-sm">{task.title}</span>
-            <TaskStatusBadge status={status} />
-          </div>
-          <div className="flex items-center gap-3 text-xs text-muted-foreground">
-            <span className="flex items-center gap-1"><Calendar className="w-3 h-3" /> {format(new Date(task.due_date), 'MMM d, yyyy')}</span>
-            {task.due_time && <span className="flex items-center gap-1"><Clock className="w-3 h-3" /> {task.due_time}</span>}
-          </div>
-          {task.description && <p className="text-sm text-muted-foreground mt-1 line-clamp-2">{task.description}</p>}
+          <Button variant="ghost" size="sm" onClick={onEdit} aria-label="Edit property"><Pencil className="w-3.5 h-3.5" /></Button>
+          <Button
+            variant="ghost" size="sm" onClick={onDelete} aria-label="Delete property"
+            className="text-muted-foreground hover:text-red-600"
+          >
+            <Trash2 className="w-3.5 h-3.5" />
+          </Button>
         </div>
       </div>
     </div>
   )
 }
-
-// Sheets
-function StageConfirmSheet({ open, onOpenChange, pendingStage, onConfirm, clientName }: { open: boolean; onOpenChange: (o: boolean) => void; pendingStage: string; onConfirm: () => void; clientName: string }) {
-  return (
-    <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent>
-        <SheetHeader>
-          <SheetTitle>Confirm Stage Change</SheetTitle>
-          <SheetDescription>
-            Move <strong>{clientName}</strong> from current stage to <strong>{STAGE_LABELS[pendingStage as keyof typeof STAGE_LABELS]}</strong>?
-            This will timestamp the transition and recalculate health status.
-          </SheetDescription>
-        </SheetHeader>
-        <SheetFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
-          <Button onClick={onConfirm}>Confirm</Button>
-        </SheetFooter>
-      </SheetContent>
-    </Sheet>
-  )
-}
-
-function AddPropertySheet({ open, onOpenChange, form, setForm, onSubmit }: { open: boolean; onOpenChange: (o: boolean) => void; form: any; setForm: (f: any) => void; onSubmit: (e: React.FormEvent) => void }) {
-  return (
-    <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetTrigger><Button variant="outline">Add Property</Button></SheetTrigger>
-      <SheetContent side="right" className="w-full max-w-md">
-        <SheetHeader>
-          <SheetTitle>Add Property</SheetTitle>
-          <SheetDescription>Add a new timeshare/fractional property for this client</SheetDescription>
-        </SheetHeader>
-        <form onSubmit={onSubmit} className="space-y-4 p-4">
-          <div className="space-y-2">
-            <label className="text-sm font-medium">Resort Name *</label>
-            <Input value={form.resort_name} onChange={e => setForm({...form, resort_name: e.target.value})} required />
-          </div>
-          <div className="space-y-2">
-            <label className="text-sm font-medium">Resort Location *</label>
-            <Input value={form.resort_location} onChange={e => setForm({...form, resort_location: e.target.value})} required />
-          </div>
-          <div className="space-y-2">
-            <label className="text-sm font-medium">Unit Number</label>
-            <Input value={form.unit_number} onChange={e => setForm({...form, unit_number: e.target.value})} />
-          </div>
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Purchase Price</label>
-              <Input type="number" step="0.01" value={form.purchase_price} onChange={e => setForm({...form, purchase_price: e.target.value})} />
-            </div>
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Loan Balance</label>
-              <Input type="number" step="0.01" value={form.loan_balance} onChange={e => setForm({...form, loan_balance: e.target.value})} />
-            </div>
-          </div>
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Maintenance Fee</label>
-              <Input type="number" step="0.01" value={form.maintenance_fee} onChange={e => setForm({...form, maintenance_fee: e.target.value})} />
-            </div>
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Fee Due Date</label>
-              <Input type="date" value={form.fee_due_date} onChange={e => setForm({...form, fee_due_date: e.target.value})} />
-            </div>
-          </div>
-          <div className="space-y-2">
-            <label className="text-sm font-medium">Document Reference (URL)</label>
-            <Input value={form.document_reference} onChange={e => setForm({...form, document_reference: e.target.value})} placeholder="https://..." />
-          </div>
-          <SheetFooter>
-            <Button type="submit" className="w-full">Add Property</Button>
-          </SheetFooter>
-        </form>
-      </SheetContent>
-    </Sheet>
-  )
-}
-
-function AddNoteSheet({ open, onOpenChange, form, setForm, onSubmit }: { open: boolean; onOpenChange: (o: boolean) => void; form: any; setForm: (f: any) => void; onSubmit: (e: React.FormEvent) => void }) {
-  return (
-    <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetTrigger><Button variant="outline">Add Note</Button></SheetTrigger>
-      <SheetContent side="right" className="w-full max-w-md">
-        <SheetHeader>
-          <SheetTitle>Add Note</SheetTitle>
-          <SheetDescription>Log a communication or internal note</SheetDescription>
-        </SheetHeader>
-        <form onSubmit={onSubmit} className="space-y-4 p-4">
-          <div className="space-y-2">
-            <label className="text-sm font-medium">Channel *</label>
-            <Select value={form.channel} onValueChange={v => setForm({...form, channel: v})}>
-              <SelectTrigger><SelectValue /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="call">Call</SelectItem>
-                <SelectItem value="email">Email</SelectItem>
-                <SelectItem value="sms">SMS</SelectItem>
-                <SelectItem value="meeting">Meeting</SelectItem>
-                <SelectItem value="internal">Internal</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="space-y-2">
-            <label className="text-sm font-medium">Content *</label>
-            <Textarea value={form.content} onChange={e => setForm({...form, content: e.target.value})} rows={6} required />
-          </div>
-          <SheetFooter>
-            <Button type="submit" className="w-full">Add Note</Button>
-          </SheetFooter>
-        </form>
-      </SheetContent>
-    </Sheet>
-  )
-}
-
-function AddTaskSheet({ open, onOpenChange, form, setForm, onSubmit }: { open: boolean; onOpenChange: (o: boolean) => void; form: any; setForm: (f: any) => void; onSubmit: (e: React.FormEvent) => void }) {
-  return (
-    <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetTrigger><Button variant="outline">Add Task</Button></SheetTrigger>
-      <SheetContent side="right" className="w-full max-w-md">
-        <SheetHeader>
-          <SheetTitle>Add Task</SheetTitle>
-          <SheetDescription>Schedule a follow-up or action item</SheetDescription>
-        </SheetHeader>
-        <form onSubmit={onSubmit} className="space-y-4 p-4">
-          <div className="space-y-2">
-            <label className="text-sm font-medium">Title *</label>
-            <Input value={form.title} onChange={e => setForm({...form, title: e.target.value})} required />
-          </div>
-          <div className="space-y-2">
-            <label className="text-sm font-medium">Description</label>
-            <Textarea value={form.description} onChange={e => setForm({...form, description: e.target.value})} rows={3} />
-          </div>
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Due Date *</label>
-              <Input type="date" value={form.due_date} onChange={e => setForm({...form, due_date: e.target.value})} required min={new Date().toISOString().split('T')[0]} />
-            </div>
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Due Time</label>
-              <Input type="time" value={form.due_time} onChange={e => setForm({...form, due_time: e.target.value})} />
-            </div>
-          </div>
-          <SheetFooter>
-            <Button type="submit" className="w-full">Create Task</Button>
-          </SheetFooter>
-        </form>
-      </SheetContent>
-    </Sheet>
-  )
-}
-

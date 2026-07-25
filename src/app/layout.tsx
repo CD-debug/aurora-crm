@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { IBM_Plex_Sans, IBM_Plex_Mono, Fraunces } from "next/font/google";
 import { QueryProvider } from "@/lib/data/provider";
+import { Toaster } from "@/components/shared/toaster";
 import "./globals.css";
 
 const ibmPlexSans = IBM_Plex_Sans({
@@ -38,6 +39,7 @@ export default function RootLayout({
     >
       <body className="min-h-full flex flex-col bg-background text-foreground">
         <QueryProvider>{children}</QueryProvider>
+        <Toaster />
       </body>
     </html>
   );

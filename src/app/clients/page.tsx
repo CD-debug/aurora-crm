@@ -1,304 +1,434 @@
 'use client'
 
-import { Suspense, useState, useEffect, useCallback } from 'react'
-import { useSearchParams, useRouter } from 'next/navigation'
+// Clients directory (PRD §10) — the governing index of the whole system.
+// One query (clients_with_health), filtered/sorted client-side with all
+// state in the URL (PRD §7.3), health + mini Aurora Arc per row, and
+// duplicate detection at the point of creation.
+
+import { Suspense, useMemo, useState } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { format } from 'date-fns'
+import {
+  ChevronUp, ChevronDown, Search, X, Plus, MoreHorizontal, AlertTriangle,
+} from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
-import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell, TableCaption } from '@/components/ui/table'
+import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/table'
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator } from '@/components/ui/dropdown-menu'
-import { Sheet, SheetTrigger, SheetContent, SheetHeader, SheetTitle, SheetDescription, SheetFooter } from '@/components/ui/sheet'
-import { NavRail, Toaster, AuroraArcStepper, ClientHealthBadge, StageBadge } from '@/components/shared'
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription, SheetFooter } from '@/components/ui/sheet'
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog'
+import { NavRail, AuroraArcStepper, ClientHealthBadge, StageBadge } from '@/components/shared'
 import { createClient } from '@/lib/supabase/client'
-import { ChevronUp, ChevronDown, Search, X, Tag, MoreHorizontal } from 'lucide-react'
+import { fetchClients, invalidateAfterMutation } from '@/lib/data/client-queries'
+import { queryKeys } from '@/lib/data/query-keys'
+import { createClientRecord, deleteClient } from '@/lib/data/mutations'
+import { filterClients, HEALTH_LABELS, STAGE_LABELS } from '@/lib/data/domain'
+import type { ClientWithHealth } from '@/lib/data/types'
+import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
 
-interface Client {
-  id: string
-  name: string
-  phone: string
-  email: string
-  state: string
-  zip: string
-  stage: 'consultation' | 'exit_plan' | 'in_progress' | 'resolved'
-  health_status: 'on_track' | 'at_risk' | 'stalled'
-  created_at: string
-  updated_at: string
-}
+const SORTABLE = ['name', 'state', 'health_status', 'stage', 'last_contact_at'] as const
+type SortKey = (typeof SORTABLE)[number]
 
-const STAGE_LABELS = {
-  consultation: 'Consultation',
-  exit_plan: 'Exit Plan',
-  in_progress: 'In Progress',
-  resolved: 'Resolved',
-} as const
+const EMPTY_FORM = { name: '', phone: '', email: '', state: '', zip: '', tags: '' }
 
 function ClientsPageContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
-  
-  const [clients, setClients] = useState<Client[]>([])
-  const [loading, setLoading] = useState(true)
-  const [sortConfig, setSortConfig] = useState<{ key: string; direction: 'asc' | 'desc' }>({ key: 'created_at', direction: 'desc' })
-  
-  const [addClientOpen, setAddClientOpen] = useState(false)
-  const [newClient, setNewClient] = useState({
-    name: '', phone: '', email: '', state: '', zip: ''
+  const queryClient = useQueryClient()
+  const [supabase] = useState(() => createClient())
+
+  const { data: clients = [], isLoading, isError, error } = useQuery({
+    queryKey: queryKeys.clients.all,
+    queryFn: () => fetchClients(supabase),
   })
 
+  // --- URL-driven filter/sort state (PRD §7.3) -----------------------------
   const filters = {
-    search: searchParams.get('search') || '',
-    health: searchParams.get('health') || '',
-    state: searchParams.get('state') || '',
-    stage: searchParams.get('stage') || '',
+    search: searchParams.get('search') ?? '',
+    health: searchParams.get('health') ?? '',
+    state: searchParams.get('state') ?? '',
+    stage: searchParams.get('stage') ?? '',
+    tag: searchParams.get('tag') ?? '',
   }
+  const sortKey = (searchParams.get('sort') as SortKey) || 'name'
+  const sortDir = searchParams.get('dir') === 'desc' ? 'desc' : 'asc'
 
-  const fetchClients = useCallback(async () => {
-    setLoading(true)
-    try {
-      const params = new URLSearchParams()
-      if (filters.search) params.set('search', filters.search)
-      if (filters.health) params.set('health', filters.health)
-      if (filters.state) params.set('state', filters.state)
-      if (filters.stage) params.set('stage', filters.stage)
-      params.set('sort', sortConfig.key)
-      params.set('direction', sortConfig.direction)
-      
-      const response = await fetch(`/api/clients?${params.toString()}`)
-      if (response.ok) {
-        const data = await response.json()
-        setClients(data.clients || [])
-      }
-    } catch (error) {
-      console.error('Failed to fetch clients:', error)
-    } finally {
-      setLoading(false)
-    }
-  }, [filters, sortConfig])
-
-  useEffect(() => {
-    fetchClients()
-  }, [fetchClients])
-
-  const handleFilterChange = (key: string, value: string) => {
+  const setParams = (updates: Record<string, string | null>) => {
     const params = new URLSearchParams(searchParams.toString())
-    if (value) params.set(key, value)
-    else params.delete(key)
-    router.push(`/clients?${params.toString()}`)
+    for (const [k, v] of Object.entries(updates)) {
+      if (v) params.set(k, v)
+      else params.delete(k)
+    }
+    router.replace(`/clients?${params.toString()}`, { scroll: false })
   }
 
-  const handleSort = (key: string) => {
-    setSortConfig(prev => ({
-      key,
-      direction: prev.key === key && prev.direction === 'asc' ? 'desc' : 'asc'
-    }))
+  const handleSort = (key: SortKey) => {
+    setParams({
+      sort: key,
+      dir: sortKey === key && sortDir === 'asc' ? 'desc' : 'asc',
+    })
   }
 
-  const handleAddClient = async (e: React.FormEvent) => {
-    e.preventDefault()
+  // --- Derived list ----------------------------------------------------------
+  const visible = useMemo(() => {
+    const filtered = filterClients(clients, filters)
+    const dir = sortDir === 'asc' ? 1 : -1
+    return [...filtered].sort((a, b) => {
+      const av = a[sortKey] ?? ''
+      const bv = b[sortKey] ?? ''
+      return av < bv ? -dir : av > bv ? dir : 0
+    })
+  }, [clients, filters.search, filters.health, filters.state, filters.stage, filters.tag, sortKey, sortDir])
+
+  const allStates = useMemo(() => [...new Set(clients.map((c) => c.state))].sort(), [clients])
+  const allTags = useMemo(() => [...new Set(clients.flatMap((c) => c.tags))].sort(), [clients])
+  const hasFilters = Object.values(filters).some(Boolean)
+
+  // --- Add client ------------------------------------------------------------
+  const [addOpen, setAddOpen] = useState(false)
+  const [form, setForm] = useState(EMPTY_FORM)
+  const [saving, setSaving] = useState(false)
+  const [duplicates, setDuplicates] = useState<Array<Pick<ClientWithHealth, 'id' | 'name' | 'email' | 'phone'>>>([])
+
+  const submitNewClient = async (allowDuplicate = false) => {
+    setSaving(true)
     try {
-      const response = await fetch('/api/clients', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(newClient)
-      })
-      if (response.ok) {
-        setAddClientOpen(false)
-        setNewClient({ name: '', phone: '', email: '', state: '', zip: '' })
-        fetchClients()
+      const result = await createClientRecord(
+        {
+          name: form.name,
+          phone: form.phone,
+          email: form.email,
+          state: form.state,
+          zip: form.zip,
+          tags: form.tags ? form.tags.split(',').map((t) => t.trim()).filter(Boolean) : [],
+        },
+        { allowDuplicate }
+      )
+      if (result.status === 'duplicates') {
+        setDuplicates(result.matches)
+        return
       }
-    } catch (error) {
-      console.error('Failed to create client:', error)
+      await invalidateAfterMutation(queryClient, result.client.id)
+      toast.success(`${result.client.name} added to your caseload`)
+      setAddOpen(false)
+      setForm(EMPTY_FORM)
+      setDuplicates([])
+      router.push(`/clients/${result.client.id}`)
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Couldn't add this client. Check the details and try again.")
+    } finally {
+      setSaving(false)
     }
   }
 
-  const getUniqueValues = (key: keyof Client) => {
-    const values = new Set(clients.map(c => c[key]).filter(Boolean))
-    return Array.from(values).sort()
+  // --- Delete ----------------------------------------------------------------
+  const [deleteTarget, setDeleteTarget] = useState<ClientWithHealth | null>(null)
+  const [deleting, setDeleting] = useState(false)
+
+  const confirmDelete = async () => {
+    if (!deleteTarget) return
+    setDeleting(true)
+    try {
+      await deleteClient(deleteTarget.id)
+      await invalidateAfterMutation(queryClient)
+      toast.success(`${deleteTarget.name} and their case records were deleted`)
+      setDeleteTarget(null)
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Couldn't delete this client. Try again.")
+    } finally {
+      setDeleting(false)
+    }
   }
 
-  const sortedClients = [...clients].sort((a, b) => {
-    const aVal = a[sortConfig.key as keyof Client]
-    const bVal = b[sortConfig.key as keyof Client]
-    if (aVal < bVal) return sortConfig.direction === 'asc' ? -1 : 1
-    if (aVal > bVal) return sortConfig.direction === 'asc' ? 1 : -1
-    return 0
-  })
+  const SortHead = ({ label, k, className }: { label: string; k: SortKey; className?: string }) => (
+    <TableHead className={cn('cursor-pointer select-none hover:bg-muted', className)} onClick={() => handleSort(k)}>
+      <div className="flex items-center gap-1">
+        {label}
+        {sortKey === k && (sortDir === 'asc' ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />)}
+      </div>
+    </TableHead>
+  )
 
   return (
     <div className="flex h-screen bg-background">
       <NavRail />
       <main className="flex-1 ml-16 overflow-auto transition-all duration-200 lg:ml-64">
-        <Toaster />
-        
         <div className="container mx-auto px-4 py-6">
           {/* Header */}
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
             <div>
               <h1 className="text-3xl font-heading font-semibold tracking-tight">Clients</h1>
-              <p className="text-muted-foreground mt-1">Manage your case directory</p>
+              <p className="text-muted-foreground mt-1">Your full case directory — click any row to open Client 360</p>
             </div>
-            <Sheet open={addClientOpen} onOpenChange={setAddClientOpen}>
-              <SheetTrigger><Button variant="outline">
-                  <Tag className="w-4 h-4 mr-2" />
-                  Add Client
-                </Button>
-              </SheetTrigger>
-              <SheetContent side="right">
-                <SheetHeader>
-                  <SheetTitle>Add New Client</SheetTitle>
-                  <SheetDescription>Enter client information to create a new case</SheetDescription>
-                </SheetHeader>
-                <form onSubmit={handleAddClient} className="space-y-4 p-4">
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium">Full Name *</label>
-                    <Input value={newClient.name} onChange={e => setNewClient({...newClient, name: e.target.value})} required />
-                  </div>
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium">Phone *</label>
-                    <Input type="tel" value={newClient.phone} onChange={e => setNewClient({...newClient, phone: e.target.value})} required />
-                  </div>
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium">Email *</label>
-                    <Input type="email" value={newClient.email} onChange={e => setNewClient({...newClient, email: e.target.value})} required />
-                  </div>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <label className="text-sm font-medium">State *</label>
-                      <Input value={newClient.state} onChange={e => setNewClient({...newClient, state: e.target.value})} required maxLength={2} />
-                    </div>
-                    <div className="space-y-2">
-                      <label className="text-sm font-medium">ZIP *</label>
-                      <Input value={newClient.zip} onChange={e => setNewClient({...newClient, zip: e.target.value})} required maxLength={5} />
-                    </div>
-                  </div>
-                  <SheetFooter>
-                    <Button type="submit" className="w-full">Create Client</Button>
-                  </SheetFooter>
-                </form>
-              </SheetContent>
-            </Sheet>
+            <Button onClick={() => setAddOpen(true)}>
+              <Plus className="w-4 h-4 mr-2" />
+              Add Client
+            </Button>
           </div>
 
-          {/* Filters */}
+          {/* Filter bar */}
           <div className="mb-4 p-4 rounded-lg border bg-card">
-            <div className="flex flex-wrap items-center gap-4">
-              <div className="relative flex-1 min-w-[200px]">
+            <div className="flex flex-wrap items-center gap-3">
+              <div className="relative flex-1 min-w-[220px]">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                 <Input
-                  placeholder="Search name, phone, email..."
+                  placeholder="Search name, phone, or email…"
                   value={filters.search}
-                  onChange={e => handleFilterChange('search', e.target.value)}
+                  onChange={(e) => setParams({ search: e.target.value || null })}
                   className="pl-10"
                 />
               </div>
               <select
                 value={filters.health}
-                onChange={e => handleFilterChange('health', e.target.value)}
+                onChange={(e) => setParams({ health: e.target.value || null })}
                 className="px-3 py-2 border rounded-md bg-background text-sm"
+                aria-label="Filter by health"
               >
                 <option value="">All Health</option>
-                <option value="on_track">On Track</option>
-                <option value="at_risk">At Risk</option>
-                <option value="stalled">Stalled</option>
-              </select>
-              <select
-                value={filters.state}
-                onChange={e => handleFilterChange('state', e.target.value)}
-                className="px-3 py-2 border rounded-md bg-background text-sm"
-              >
-                <option value="">All States</option>
-                {getUniqueValues('state').map(s => <option key={s} value={s}>{s}</option>)}
+                {Object.entries(HEALTH_LABELS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
               </select>
               <select
                 value={filters.stage}
-                onChange={e => handleFilterChange('stage', e.target.value)}
+                onChange={(e) => setParams({ stage: e.target.value || null })}
                 className="px-3 py-2 border rounded-md bg-background text-sm"
+                aria-label="Filter by stage"
               >
                 <option value="">All Stages</option>
+                <option value="active">Active (not resolved)</option>
                 {Object.entries(STAGE_LABELS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
               </select>
-              {(filters.search || filters.health || filters.state || filters.stage) && (
-                <Button variant="ghost" size="sm" onClick={() => router.push('/clients')}>
+              <select
+                value={filters.state}
+                onChange={(e) => setParams({ state: e.target.value || null })}
+                className="px-3 py-2 border rounded-md bg-background text-sm"
+                aria-label="Filter by state"
+              >
+                <option value="">All States</option>
+                {allStates.map((s) => <option key={s} value={s}>{s}</option>)}
+              </select>
+              {allTags.length > 0 && (
+                <select
+                  value={filters.tag}
+                  onChange={(e) => setParams({ tag: e.target.value || null })}
+                  className="px-3 py-2 border rounded-md bg-background text-sm"
+                  aria-label="Filter by tag"
+                >
+                  <option value="">All Tags</option>
+                  {allTags.map((t) => <option key={t} value={t}>{t}</option>)}
+                </select>
+              )}
+              {hasFilters && (
+                <Button variant="ghost" size="sm" onClick={() => router.replace('/clients')}>
                   <X className="w-4 h-4 mr-1" />
-                  Clear Filters
+                  Clear
                 </Button>
               )}
             </div>
           </div>
 
-          {/* Client Table */}
-          <div className="rounded-lg border bg-card overflow-hidden">
-            {loading ? (
-              <div className="p-8 text-center text-muted-foreground">Loading clients...</div>
-            ) : sortedClients.length === 0 ? (
-              <div className="p-8 text-center">
-                <p className="text-muted-foreground mb-4">No clients found</p>
-                <Button onClick={() => setAddClientOpen(true)}>Add your first client</Button>
+          {/* Table */}
+          {isLoading ? (
+            <div className="rounded-lg border bg-card p-4 space-y-3" aria-label="Loading clients">
+              {Array.from({ length: 6 }).map((_, i) => (
+                <div key={i} className="h-10 rounded-md bg-muted/60 animate-pulse" />
+              ))}
+            </div>
+          ) : isError ? (
+            <div className="rounded-lg border bg-card p-8 text-center">
+              <p className="text-muted-foreground">{error instanceof Error ? error.message : "Couldn't load clients. Check your connection and try again."}</p>
+            </div>
+          ) : visible.length === 0 ? (
+            <div className="rounded-lg border bg-card p-10 text-center">
+              {hasFilters ? (
+                <>
+                  <p className="text-muted-foreground mb-4">No clients match these filters.</p>
+                  <Button variant="outline" onClick={() => router.replace('/clients')}>Clear filters</Button>
+                </>
+              ) : (
+                <>
+                  <p className="text-muted-foreground mb-4">No clients yet. Add your first client to open a case.</p>
+                  <Button onClick={() => setAddOpen(true)}>
+                    <Plus className="w-4 h-4 mr-2" />
+                    Add your first client
+                  </Button>
+                </>
+              )}
+            </div>
+          ) : (
+            <div className="rounded-lg border bg-card overflow-hidden">
+              <Table>
+                <TableHeader>
+                  <TableRow className="bg-muted/50">
+                    <SortHead label="Name" k="name" />
+                    <TableHead>Phone</TableHead>
+                    <SortHead label="State" k="state" />
+                    <TableHead>ZIP</TableHead>
+                    <TableHead>Email</TableHead>
+                    <SortHead label="Health" k="health_status" />
+                    <SortHead label="Stage" k="stage" />
+                    <SortHead label="Last Contact" k="last_contact_at" />
+                    <TableHead className="w-12" />
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {visible.map((client) => (
+                    <TableRow
+                      key={client.id}
+                      className="cursor-pointer hover:bg-muted/50 transition-colors"
+                      onClick={() => router.push(`/clients/${client.id}`)}
+                    >
+                      <TableCell>
+                        <div className="font-medium">{client.name}</div>
+                        {client.tags.length > 0 && (
+                          <div className="flex flex-wrap gap-1 mt-1">
+                            {client.tags.map((t) => (
+                              <Badge key={t} variant="secondary" className="text-xs px-1.5 py-0">{t}</Badge>
+                            ))}
+                          </div>
+                        )}
+                      </TableCell>
+                      <TableCell className="font-mono text-sm">{client.phone}</TableCell>
+                      <TableCell>{client.state}</TableCell>
+                      <TableCell className="font-mono text-sm">{client.zip}</TableCell>
+                      <TableCell className="max-w-[200px] truncate">{client.email}</TableCell>
+                      <TableCell><ClientHealthBadge status={client.health_status} /></TableCell>
+                      <TableCell>
+                        <div className="flex items-center gap-2">
+                          <AuroraArcStepper currentStage={client.stage} variant="mini" />
+                          <span className="text-xs text-muted-foreground">{STAGE_LABELS[client.stage]}</span>
+                        </div>
+                      </TableCell>
+                      <TableCell className="text-sm text-muted-foreground whitespace-nowrap">
+                        {client.last_contact_at
+                          ? format(new Date(client.last_contact_at), 'MMM d, yyyy')
+                          : 'No contact yet'}
+                      </TableCell>
+                      <TableCell>
+                        <DropdownMenu>
+                          <DropdownMenuTrigger
+                            className="inline-flex items-center justify-center rounded-lg h-8 w-8 hover:bg-muted transition-colors focus-visible:ring-2 focus-visible:ring-ring/50 outline-none"
+                            onClick={(e) => e.stopPropagation()}
+                            aria-label={`Actions for ${client.name}`}
+                          >
+                            <MoreHorizontal className="w-4 h-4" />
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()}>
+                            <DropdownMenuItem onClick={() => router.push(`/clients/${client.id}`)}>Open Client 360</DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => router.push(`/clients/${client.id}#properties`)}>Properties</DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => router.push(`/clients/${client.id}#tasks`)}>Tasks</DropdownMenuItem>
+                            <DropdownMenuSeparator />
+                            <DropdownMenuItem className="text-red-600" onClick={() => setDeleteTarget(client)}>Delete</DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+              <p className="p-3 text-sm text-muted-foreground border-t">
+                {visible.length} of {clients.length} client{clients.length !== 1 ? 's' : ''} · Click a row to open Client 360
+              </p>
+            </div>
+          )}
+        </div>
+
+        {/* Add Client sheet (with duplicate detection, PRD §10) */}
+        <Sheet open={addOpen} onOpenChange={(open) => { setAddOpen(open); if (!open) setDuplicates([]) }}>
+          <SheetContent side="right" className="w-full max-w-md overflow-y-auto">
+            <SheetHeader>
+              <SheetTitle>Add New Client</SheetTitle>
+              <SheetDescription>This opens a new case at the Consultation stage.</SheetDescription>
+            </SheetHeader>
+
+            {duplicates.length > 0 ? (
+              <div className="p-4 space-y-4">
+                <div className="rounded-lg border border-amber-200 bg-amber-50 p-4">
+                  <div className="flex items-center gap-2 text-amber-800 font-medium mb-2">
+                    <AlertTriangle className="w-4 h-4" />
+                    Possible duplicate{duplicates.length > 1 ? 's' : ''} found
+                  </div>
+                  <p className="text-sm text-amber-800 mb-3">
+                    {duplicates.length === 1 ? 'A client' : 'Clients'} with matching name, email, or phone already
+                    {duplicates.length === 1 ? ' exists' : ' exist'}:
+                  </p>
+                  <ul className="space-y-2">
+                    {duplicates.map((d) => (
+                      <li key={d.id} className="text-sm bg-card rounded-md border p-2">
+                        <span className="font-medium">{d.name}</span>
+                        <span className="text-muted-foreground"> — {d.email} · {d.phone}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+                <div className="flex gap-2">
+                  <Button variant="outline" className="flex-1" onClick={() => setDuplicates([])}>Go back</Button>
+                  <Button className="flex-1" disabled={saving} onClick={() => submitNewClient(true)}>
+                    {saving ? 'Creating…' : 'Create anyway'}
+                  </Button>
+                </div>
               </div>
             ) : (
-              <>
-                <Table>
-                  <TableHeader>
-                    <TableRow className="bg-muted/50">
-                      <TableHead className="cursor-pointer hover:bg-muted" onClick={() => handleSort('name')}>
-                        <div className="flex items-center gap-1">
-                          Name
-                          {sortConfig.key === 'name' && (sortConfig.direction === 'asc' ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />)}
-                        </div>
-                      </TableHead>
-                      <TableHead className="cursor-pointer hover:bg-muted" onClick={() => handleSort('phone')}>Phone</TableHead>
-                      <TableHead className="cursor-pointer hover:bg-muted" onClick={() => handleSort('state')}>State</TableHead>
-                      <TableHead className="cursor-pointer hover:bg-muted" onClick={() => handleSort('zip')}>ZIP</TableHead>
-                      <TableHead className="cursor-pointer hover:bg-muted" onClick={() => handleSort('email')}>Email</TableHead>
-                      <TableHead>Health</TableHead>
-                      <TableHead>Stage</TableHead>
-                      <TableHead className="w-12"></TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {sortedClients.map((client) => (
-                      <TableRow key={client.id} className="cursor-pointer hover:bg-muted/50 transition-colors" onClick={() => router.push(`/clients/${client.id}`)}>
-                        <TableCell className="font-medium">{client.name}</TableCell>
-                        <TableCell>{client.phone}</TableCell>
-                        <TableCell>{client.state}</TableCell>
-                        <TableCell>{client.zip}</TableCell>
-                        <TableCell>{client.email}</TableCell>
-                        <TableCell>
-                          <ClientHealthBadge status={client.health_status} />
-                        </TableCell>
-                        <TableCell>
-                          <div className="flex items-center gap-2">
-                            <StageBadge stage={client.stage} />
-                            <AuroraArcStepper currentStage={client.stage} variant="mini" />
-                          </div>
-                        </TableCell>
-                        <TableCell>
-                          <DropdownMenu>
-                            <DropdownMenuTrigger><Button variant="ghost" size="icon" className="h-8 w-8">
-                                <MoreHorizontal className="w-4 h-4" />
-                              </Button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end">
-                              <DropdownMenuItem onClick={() => router.push(`/clients/${client.id}`)}>View Details</DropdownMenuItem>
-                              <DropdownMenuItem onClick={() => router.push(`/clients/${client.id}#properties`)}>Properties</DropdownMenuItem>
-                              <DropdownMenuItem onClick={() => router.push(`/clients/${client.id}#tasks`)}>Tasks</DropdownMenuItem>
-                              <DropdownMenuSeparator />
-                              <DropdownMenuItem className="text-red-600">Delete</DropdownMenuItem>
-                            </DropdownMenuContent>
-                          </DropdownMenu>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-                <TableCaption className="p-4 text-sm text-muted-foreground">
-                  {sortedClients.length} client{sortedClients.length !== 1 ? 's' : ''} &bull; Click a row to view details
-                </TableCaption>
-              </>
+              <form
+                onSubmit={(e) => { e.preventDefault(); submitNewClient() }}
+                className="space-y-4 p-4"
+              >
+                <div className="space-y-2">
+                  <label className="text-sm font-medium" htmlFor="nc-name">Full Name *</label>
+                  <Input id="nc-name" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-sm font-medium" htmlFor="nc-phone">Phone *</label>
+                  <Input id="nc-phone" type="tel" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} required />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-sm font-medium" htmlFor="nc-email">Email *</label>
+                  <Input id="nc-email" type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} required />
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium" htmlFor="nc-state">State *</label>
+                    <Input id="nc-state" value={form.state} onChange={(e) => setForm({ ...form, state: e.target.value.toUpperCase() })} required maxLength={2} placeholder="FL" />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium" htmlFor="nc-zip">ZIP *</label>
+                    <Input id="nc-zip" value={form.zip} onChange={(e) => setForm({ ...form, zip: e.target.value })} required maxLength={10} />
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <label className="text-sm font-medium" htmlFor="nc-tags">Tags</label>
+                  <Input id="nc-tags" value={form.tags} onChange={(e) => setForm({ ...form, tags: e.target.value })} placeholder="VIP, Referral — comma separated" />
+                </div>
+                <SheetFooter>
+                  <Button type="submit" className="w-full" disabled={saving}>
+                    {saving ? 'Creating…' : 'Create Client'}
+                  </Button>
+                </SheetFooter>
+              </form>
             )}
-          </div>
-        </div>
+          </SheetContent>
+        </Sheet>
+
+        {/* Delete confirmation */}
+        <Dialog open={!!deleteTarget} onOpenChange={(open) => !open && setDeleteTarget(null)}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Delete {deleteTarget?.name}?</DialogTitle>
+              <DialogDescription>
+                This permanently removes the client along with all their properties, notes, and tasks.
+                This can&apos;t be undone.
+              </DialogDescription>
+            </DialogHeader>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setDeleteTarget(null)} disabled={deleting}>Cancel</Button>
+              <Button variant="destructive" onClick={confirmDelete} disabled={deleting}>
+                {deleting ? 'Deleting…' : 'Delete Client'}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </main>
     </div>
   )
@@ -306,7 +436,14 @@ function ClientsPageContent() {
 
 export default function ClientsPage() {
   return (
-    <Suspense fallback={<div className="container mx-auto px-4 py-8 text-center text-muted-foreground">Loading clients...</div>}>
+    <Suspense fallback={
+      <div className="flex h-screen bg-background">
+        <NavRail />
+        <main className="flex-1 ml-16 lg:ml-64 p-8">
+          <div className="space-y-3">{Array.from({ length: 6 }).map((_, i) => <div key={i} className="h-10 rounded-md bg-muted/60 animate-pulse" />)}</div>
+        </main>
+      </div>
+    }>
       <ClientsPageContent />
     </Suspense>
   )
