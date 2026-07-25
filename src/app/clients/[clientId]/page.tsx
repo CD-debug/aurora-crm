@@ -287,7 +287,7 @@ export default function Client360Page() {
     return (
       <div className="flex h-screen bg-background">
         <NavRail />
-        <main className="flex-1 ml-16 overflow-auto lg:ml-64">
+        <main className="flex-1 ml-16 overflow-auto">
           <div className="container mx-auto px-4 py-8 space-y-4">
             <div className="h-8 w-64 rounded-md bg-muted/60 animate-pulse" />
             <div className="h-24 rounded-xl bg-muted/60 animate-pulse" />
@@ -302,7 +302,7 @@ export default function Client360Page() {
     return (
       <div className="flex h-screen bg-background">
         <NavRail />
-        <main className="flex-1 ml-16 overflow-auto lg:ml-64">
+        <main className="flex-1 ml-16 overflow-auto">
           <div className="container mx-auto px-4 py-16 text-center">
             <h1 className="text-2xl font-heading font-semibold mb-2">Client not found</h1>
             <p className="text-muted-foreground mb-6">
@@ -329,7 +329,7 @@ export default function Client360Page() {
   return (
     <div className="flex h-screen bg-background">
       <NavRail />
-      <main className="flex-1 ml-16 overflow-auto transition-all duration-200 lg:ml-64">
+      <main className="flex-1 ml-16 overflow-auto">
         {/* Sticky header (PRD §11.6) */}
         <header className="sticky top-0 z-30 bg-background/95 backdrop-blur border-b border-border">
           <div className="container mx-auto px-4 py-3">

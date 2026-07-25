@@ -31,7 +31,7 @@ export default async function DashboardPage() {
   return (
     <div className="flex h-screen bg-background">
       <NavRail />
-      <main className="flex-1 ml-16 overflow-auto transition-all duration-200 lg:ml-64">
+      <main className="flex-1 ml-16 overflow-auto">
         <div className="container mx-auto px-4 py-6">
           <div className="mb-8">
             <h1 className="text-3xl font-heading font-semibold tracking-tight">Overview Dashboard</h1>

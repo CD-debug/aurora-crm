@@ -155,7 +155,7 @@ function ClientsPageContent() {
   return (
     <div className="flex h-screen bg-background">
       <NavRail />
-      <main className="flex-1 ml-16 overflow-auto transition-all duration-200 lg:ml-64">
+      <main className="flex-1 ml-16 overflow-auto">
         <div className="container mx-auto px-4 py-6">
           {/* Header */}
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
@@ -439,7 +439,7 @@ export default function ClientsPage() {
     <Suspense fallback={
       <div className="flex h-screen bg-background">
         <NavRail />
-        <main className="flex-1 ml-16 lg:ml-64 p-8">
+        <main className="flex-1 ml-16 p-8">
           <div className="space-y-3">{Array.from({ length: 6 }).map((_, i) => <div key={i} className="h-10 rounded-md bg-muted/60 animate-pulse" />)}</div>
         </main>
       </div>
