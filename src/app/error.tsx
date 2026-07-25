@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect } from 'react'
+import { Button } from '@/components/ui/button'
 
 export default function GlobalError({
   error,
@@ -14,40 +15,12 @@ export default function GlobalError({
   }, [error])
 
   return (
-    <html>
-      <body>
-        <div style={{
-          display: 'flex',
-          flexDirection: 'column',
-          alignItems: 'center',
-          justifyContent: 'center',
-          minHeight: '100vh',
-          padding: '2rem',
-          fontFamily: 'system-ui, sans-serif',
-        }}>
-          <h1 style={{ fontSize: '1.5rem', fontWeight: 600, marginBottom: '1rem', color: '#1f2937' }}>
-            Something went wrong
-          </h1>
-          <p style={{ color: '#6b7280', marginBottom: '1.5rem', textAlign: 'center', maxWidth: '400px' }}>
-            We encountered an unexpected error. Please try refreshing the page.
-          </p>
-          <button
-            onClick={reset}
-            style={{
-              padding: '0.75rem 1.5rem',
-              backgroundColor: '#0d9c8d',
-              color: 'white',
-              border: 'none',
-              borderRadius: '0.5rem',
-              fontSize: '1rem',
-              fontWeight: 500,
-              cursor: 'pointer',
-            }}
-          >
-            Try again
-          </button>
-        </div>
-      </body>
-    </html>
+    <div className="flex flex-col items-center justify-center min-h-screen p-8 text-center">
+      <h1 className="text-2xl font-heading font-semibold mb-2">Something went wrong</h1>
+      <p className="text-muted-foreground mb-6 max-w-md">
+        We encountered an unexpected error. Please try refreshing the page.
+      </p>
+      <Button onClick={reset}>Try again</Button>
+    </div>
   )
 }

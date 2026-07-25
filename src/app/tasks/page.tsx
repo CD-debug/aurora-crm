@@ -349,9 +349,6 @@ function TasksPageContent() {
                           <span className={cn('font-medium block truncate', completed && 'line-through text-muted-foreground')}>
                             {task.title}
                           </span>
-                          {task.description && (
-                            <span className="text-xs text-muted-foreground block truncate mt-0.5">{task.description}</span>
-                          )}
                         </td>
                         <td className="px-4 py-2.5 hidden sm:table-cell">
                           <button
@@ -396,12 +393,8 @@ function TasksPageContent() {
                     <div className="flex items-start justify-between gap-4">
                       <div className="space-y-2 flex-1 min-w-0">
                         <h3 className="font-semibold">{selectedTask.title}</h3>
-                        {selectedTask.description && (
-                          <p className="text-sm text-muted-foreground leading-relaxed">{selectedTask.description}</p>
-                        )}
                         <div className="flex items-center gap-4 text-xs text-muted-foreground">
                           <span>Created {format(parseISO(selectedTask.created_at), 'MMM d, yyyy')}</span>
-                          {selectedTask.due_time && <span className="font-mono">{selectedTask.due_time.slice(0, 5)}</span>}
                           {selectedTask.completed_at && <span>Done {format(parseISO(selectedTask.completed_at), 'MMM d, yyyy')}</span>}
                         </div>
                       </div>

@@ -1,14 +1,11 @@
 import { createServerClient, type CookieOptions } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
 
-// Next.js 16 "proxy" (formerly middleware): refresh the Supabase session and
-// gate the app behind auth. Data authorization itself lives in RLS + server
-// actions — not here (see Next docs: proxy is an optimistic check only).
-export async function proxy(request: NextRequest) {
+// Middleware: refresh the Supabase session and gate the app behind auth.
+// Data authorization lives in RLS + server actions, not here.
+export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl
 
-  // Cookies Supabase asks us to refresh during getUser(); applied to the
-  // final response below so the modified request headers survive.
   const pendingCookies: { name: string; value: string; options?: CookieOptions }[] = []
 
   const supabase = createServerClient(
@@ -31,7 +28,7 @@ export async function proxy(request: NextRequest) {
     data: { user },
   } = await supabase.auth.getUser()
 
-  const isPublicPath = pathname.startsWith('/login') || pathname.startsWith('/auth/callback')
+  const isPublicPath = pathname.startsWith('/login')
 
   if (!user && !isPublicPath) {
     const url = request.nextUrl.clone()
