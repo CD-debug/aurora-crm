@@ -163,6 +163,14 @@
       width: var(--arc-progress, 100%);
     }
   }
+
+  /* Nav tooltip / indicator: snap instead of slide */
+  @media (prefers-reduced-motion: reduce) {
+    .group-hover\:scale-110,
+    .group-hover\:scale-110:hover {
+      transform: none;
+    }
+  }
 }
 
 /* Calendar task density dots (PRD §12.1) */

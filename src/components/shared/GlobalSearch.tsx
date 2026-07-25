@@ -1,8 +1,7 @@
 'use client'
 
-// Global search / command palette (PRD §7.1): persistent in the nav rail,
-// Cmd/Ctrl+K to open, live name/phone/email matching, Enter routes straight
-// to Client 360, Esc closes.
+// Global search / command palette (PRD §7.1): Cmd/Ctrl+K to open, live
+// name/phone/email matching, Enter routes straight to Client 360, Esc closes.
 
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
@@ -13,8 +12,9 @@ import { createClient } from '@/lib/supabase/client'
 import { searchClients } from '@/lib/data/client-queries'
 import { queryKeys } from '@/lib/data/query-keys'
 import { Search, User, Phone, Mail } from 'lucide-react'
+import { cn } from '@/lib/utils'
 
-export function GlobalSearch() {
+export function GlobalSearch({ variant = 'full' }: { variant?: 'full' | 'icon' }) {
   const [open, setOpen] = useState(false)
   const [query, setQuery] = useState('')
   const router = useRouter()
@@ -46,15 +46,38 @@ export function GlobalSearch() {
 
   return (
     <>
-      <button
-        onClick={() => setOpen(true)}
-        className="flex items-center gap-2 w-full px-3 py-2 rounded-md bg-sidebar-accent text-sidebar-accent-foreground hover:bg-sidebar-accent/80 transition-colors"
-        aria-label="Search clients (Cmd+K)"
-      >
-        <Search className="h-4 w-4 opacity-60" />
-        <span className="text-sm font-medium">Search clients…</span>
-        <span className="ml-auto text-xs opacity-50 font-mono">⌘K</span>
-      </button>
+      {variant === 'icon' ? (
+        <button
+          onClick={() => setOpen(true)}
+          className="group relative flex items-center justify-center w-12 h-11 rounded-xl text-sidebar-foreground/50 hover:text-sidebar-foreground hover:bg-sidebar-accent hover:scale-110 transition-all duration-150"
+          aria-label="Search clients (Cmd+K)"
+          tabIndex={0}
+        >
+          <Search className="w-5 h-5" aria-hidden="true" />
+          <span
+            className={cn(
+              'absolute left-full ml-3 px-3 py-1.5 rounded-lg whitespace-nowrap text-sm font-medium pointer-events-none',
+              'bg-foreground text-background shadow-lg border border-border/30',
+              'opacity-0 -translate-x-1 scale-95 transition-all duration-150 ease-out',
+              'group-hover:opacity-100 group-hover:translate-x-0 group-hover:scale-100',
+              'group-focus-visible:opacity-100 group-focus-visible:translate-x-0 group-focus-visible:scale-100'
+            )}
+          >
+            <span className="absolute right-full top-1/2 -translate-y-1/2 w-2 h-2 bg-foreground rotate-45 -mr-1 rounded-sm" />
+            Search · ⌘K
+          </span>
+        </button>
+      ) : (
+        <button
+          onClick={() => setOpen(true)}
+          className="flex items-center gap-2 w-full px-3 py-2 rounded-md bg-sidebar-accent text-sidebar-accent-foreground hover:bg-sidebar-accent/80 transition-colors"
+          aria-label="Search clients (Cmd+K)"
+        >
+          <Search className="h-4 w-4 opacity-60" />
+          <span className="text-sm font-medium">Search clients…</span>
+          <span className="ml-auto text-xs opacity-50 font-mono">⌘K</span>
+        </button>
+      )}
 
       <CommandDialog
         open={open}
@@ -79,7 +102,7 @@ export function GlobalSearch() {
             )}
             {!isFetching && query.trim().length >= 2 && results.length === 0 && (
               <CommandEmpty className="py-6 text-center text-sm text-muted-foreground">
-                No clients match “{query}”.
+                No clients match "{query}".
               </CommandEmpty>
             )}
             {results.map((client) => (
