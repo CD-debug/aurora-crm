@@ -7,7 +7,7 @@ export type PipelineStage = 'consultation' | 'exit_plan' | 'in_progress' | 'reso
 export type HealthStatus = 'on_track' | 'at_risk' | 'stalled'
 export type TaskStatus = 'upcoming' | 'overdue' | 'completed' // derived, never stored
 export type NoteChannel = 'email' | 'phone' | 'text'
-export type PropertyStatus = 'active' | 'paid_off' | 'foreclosed' | 'relinquished'
+export type PropertyStatus = 'active' | 'paid_off'
 
 export interface Client {
   id: string

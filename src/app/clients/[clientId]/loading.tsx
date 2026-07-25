@@ -1,21 +1,15 @@
 export default function ClientDetailLoading() {
   return (
-    <div style={{ padding: '1.5rem' }}>
-      <div style={{ height: '1.5rem', width: '50%', background: '#e5e7eb', borderRadius: '0.25rem', marginBottom: '1rem', animation: 'pulse 1.5s ease-in-out infinite' }} />
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(250px, 1fr))', gap: '1rem' }}>
+    <div className="p-6 space-y-4">
+      <div className="h-6 w-64 rounded-md bg-muted animate-pulse" />
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         {[1, 2, 3, 4].map((i) => (
-          <div key={i} style={{ background: 'white', border: '1px solid #e5e7eb', borderRadius: '0.5rem', padding: '1rem' }}>
-            <div style={{ height: '1rem', width: '60%', background: '#e5e7eb', borderRadius: '0.25rem', marginBottom: '0.5rem', animation: 'pulse 1.5s ease-in-out infinite' }} />
-            <div style={{ height: '0.875rem', width: '80%', background: '#e5e7eb', borderRadius: '0.25rem', animation: 'pulse 1.5s ease-in-out infinite' }} />
+          <div key={i} className="rounded-lg border bg-card p-4 space-y-3">
+            <div className="h-4 w-3/5 rounded bg-muted animate-pulse" />
+            <div className="h-3.5 w-4/5 rounded bg-muted animate-pulse" />
           </div>
         ))}
       </div>
-      <style>{`
-        @keyframes pulse {
-          0%, 100% { opacity: 1; }
-          50% { opacity: 0.5; }
-        }
-      `}</style>
     </div>
   )
 }

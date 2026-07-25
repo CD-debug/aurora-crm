@@ -629,7 +629,6 @@ export default function Client360Page() {
                                   <Calendar className="w-3 h-3" />
                                   {format(new Date(task.due_date + 'T00:00:00'), 'MMM d, yyyy')}
                                 </span>
-                                {task.due_time && <span className="flex items-center gap-1 font-mono"><Clock className="w-3 h-3" />{task.due_time.slice(0, 5)}</span>}
                                 <button
                                   onClick={() => handleDeleteTask(task.id)}
                                   className="ml-auto opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-red-600 transition-all"
@@ -639,7 +638,6 @@ export default function Client360Page() {
                                   <Trash2 className="w-3.5 h-3.5" />
                                 </button>
                               </div>
-                              {task.description && <p className="text-xs text-muted-foreground mt-1 line-clamp-2">{task.description}</p>}
                             </div>
                           </div>
                         </div>

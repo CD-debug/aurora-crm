@@ -55,24 +55,26 @@ export function AuroraArcStepper({
         {STAGES.map((stage, i) => {
           const isPast = i < currentIndex
           const isCurrent = i === currentIndex
+          const isFuture = i > currentIndex
+          const canClick = onStageClick && (isFuture || isCurrent === false && isPast === false)
           return (
             <button
               key={stage}
               type="button"
-              onClick={() => onStageClick?.(stage)}
-              disabled={!onStageClick || isCurrent}
+              onClick={() => isFuture && onStageClick?.(stage)}
+              disabled={!onStageClick || isCurrent || isPast}
               className={cn(
                 'group flex flex-col items-center gap-1.5 outline-none focus-visible:ring-2 focus-visible:ring-ring/50 rounded-md px-1',
-                onStageClick && !isCurrent ? 'cursor-pointer' : 'cursor-default'
+                onStageClick && isFuture ? 'cursor-pointer' : 'cursor-default'
               )}
               aria-current={isCurrent ? 'step' : undefined}
             >
               <span
                 className={cn(
                   'flex items-center justify-center w-5 h-5 rounded-full border-2 bg-background transition-colors',
-                  isPast && 'border-[var(--arc-end)] bg-[var(--arc-end)] text-primary-foreground',
+                  isPast && 'border-[var(--arc-end)] bg-[var(--arc-end)] text-primary-foreground opacity-60',
                   isCurrent && 'border-[var(--arc-start)] bg-[var(--arc-start)]',
-                  !isPast && !isCurrent && 'border-border group-hover:border-[var(--arc-start)]'
+                  isFuture && 'border-border group-hover:border-[var(--arc-start)]'
                 )}
               >
                 {isPast && <Check className="w-3 h-3" />}
