@@ -1,122 +1,72 @@
-import { createServerSupabaseClient } from '@/lib/supabase/server'
-import { queryKeys } from './query-keys'
+// Server-side reads for Server Components (dashboard). Runs under RLS via
+// the SSR client — the signed-in owner sees exactly their own rows.
+// Interactive pages read through lib/data/client-queries.ts (browser + RLS).
 
-export async function getClients(filters?: Record<string, string>) {
-  const supabase = createServerSupabaseClient()
-  let query = supabase
-    .from('clients')
-    .select('*')
-    .order('created_at', { ascending: false })
+import { createServerClient } from '@/lib/supabase/server'
+import type { ClientWithHealth, DashboardData, PipelineStage, Property } from './types'
+import { STAGES } from './domain'
 
-  if (filters?.health) {
-    query = query.eq('health_status', filters.health)
-  }
-  if (filters?.state) {
-    query = query.eq('state', filters.state)
-  }
-  if (filters?.stage) {
-    query = query.eq('stage', filters.stage)
-  }
-  if (filters?.search) {
-    query = query.or(`name.ilike.%${filters.search}%,phone.ilike.%${filters.search}%,email.ilike.%${filters.search}%`)
-  }
+export async function getDashboardData(): Promise<DashboardData> {
+  const supabase = await createServerClient()
 
-  const { data, error } = await query
-  if (error) throw error
-  return data
-}
-
-export async function getClientById(id: string) {
-  const supabase = createServerSupabaseClient()
-  const { data, error } = await supabase
-    .from('clients')
-    .select('*')
-    .eq('id', id)
-    .single()
-  if (error) throw error
-  return data
-}
-
-export async function getClientWithRelations(id: string) {
-  const supabase = createServerSupabaseClient()
-  
-  const [{ data: client }, { data: properties }, { data: notes }, { data: tasks }] = await Promise.all([
-    supabase.from('clients').select('*').eq('id', id).single(),
-    supabase.from('properties').select('*').eq('client_id', id).order('created_at', { ascending: false }),
-    supabase.from('notes').select('*').eq('client_id', id).order('created_at', { ascending: false }),
-    supabase.from('tasks').select('*').eq('client_id', id).order('due_date', { ascending: true }),
+  const [clientsRes, propsRes] = await Promise.all([
+    supabase
+      .from('clients_with_health')
+      .select('id, name, stage, health_status, case_opened_at, resolved_at, last_contact_at, overdue_task_count'),
+    supabase.from('properties').select('status, value_eliminated, loan_balance'),
   ])
 
-  if (!client) throw new Error('Client not found')
+  if (clientsRes.error) throw new Error(`Couldn't load dashboard metrics: ${clientsRes.error.message}`)
+  if (propsRes.error) throw new Error(`Couldn't load dashboard metrics: ${propsRes.error.message}`)
 
-  return { client, properties: properties || [], notes: notes || [], tasks: tasks || [] }
-}
+  const clients = clientsRes.data as Array<
+    Pick<
+      ClientWithHealth,
+      'id' | 'name' | 'stage' | 'health_status' | 'case_opened_at' | 'resolved_at' | 'last_contact_at' | 'overdue_task_count'
+    >
+  >
+  const properties = propsRes.data as Array<Pick<Property, 'status' | 'value_eliminated' | 'loan_balance'>>
 
-export async function getTasks(filters?: { clientId?: string; status?: string; dueDate?: string }) {
-  const supabase = createServerSupabaseClient()
-  let query = supabase.from('tasks').select('*, clients(name)').order('due_date', { ascending: true })
+  const stage_counts = Object.fromEntries(STAGES.map((s) => [s, 0])) as Record<PipelineStage, number>
+  for (const c of clients) stage_counts[c.stage] += 1
 
-  if (filters?.clientId) {
-    query = query.eq('client_id', filters.clientId)
-  }
-  if (filters?.status) {
-    query = query.eq('status', filters.status)
-  }
-  if (filters?.dueDate) {
-    query = query.eq('due_date', filters.dueDate)
-  }
-
-  const { data, error } = await query
-  if (error) throw error
-  return data
-}
-
-export async function getDashboardMetrics() {
-  const supabase = createServerSupabaseClient()
-  
-  const [
-    { count: totalCases },
-    { count: activeCases },
-    { count: atRiskCases },
-    { count: resolvedCases },
-    { data: propertiesData },
-    { data: resolvedClientsData }
-  ] = await Promise.all([
-    supabase.from('clients').select('*', { count: 'exact', head: true }),
-    supabase.from('clients').select('*', { count: 'exact', head: true }).neq('stage', 'resolved'),
-    supabase.from('clients').select('*', { count: 'exact', head: true }).eq('health_status', 'at_risk'),
-    supabase.from('clients').select('*', { count: 'exact', head: true }).eq('stage', 'resolved'),
-    supabase.from('properties').select('value_eliminated, status'),
-    supabase.from('clients').select('case_opened_at').eq('stage', 'resolved')
-  ])
-
-  // Calculate total debt eliminated (only paid_off properties)
-  const totalDebtEliminated = propertiesData
-    ?.filter(p => p.status === 'paid_off')
-    .reduce((sum, p) => sum + (p.value_eliminated || 0), 0) || 0
-
-  // Calculate properties under management (active properties)
-  const propertiesUnderMgmt = propertiesData
-    ?.filter(p => p.status === 'active')
-    .length || 0
-
-  // Calculate average time to resolution
-  const avgTimeToResolution = resolvedClientsData && resolvedClientsData.length > 0
-    ? resolvedClientsData.reduce((sum, c) => sum + (new Date().getTime() - new Date(c.case_opened_at).getTime()), 0) / resolvedClientsData.length
-    : null
-
-  const totalCasesCount = totalCases || 0
-  const resolvedCasesCount = resolvedCases || 0
-  const resolutionRate = totalCasesCount > 0 ? (resolvedCasesCount / totalCasesCount * 100) : 0
+  const resolved = clients.filter((c) => c.stage === 'resolved')
+  const withResolutionTime = resolved.filter((c) => c.resolved_at)
+  const avgDays =
+    withResolutionTime.length > 0
+      ? withResolutionTime.reduce(
+          (sum, c) =>
+            sum + (new Date(c.resolved_at!).getTime() - new Date(c.case_opened_at).getTime()),
+          0
+        ) /
+        withResolutionTime.length /
+        (24 * 60 * 60 * 1000)
+      : null
 
   return {
-    total_cases: totalCasesCount,
-    active_cases: activeCases || 0,
-    at_risk_cases: atRiskCases || 0,
-    resolved_cases: resolvedCasesCount,
-    total_debt_eliminated: totalDebtEliminated,
-    properties_under_mgmt: propertiesUnderMgmt,
-    avg_time_to_resolution: avgTimeToResolution,
-    resolution_rate: resolutionRate,
+    total_cases: clients.length,
+    active_cases: clients.filter((c) => c.stage !== 'resolved').length,
+    at_risk_cases: clients.filter((c) => c.health_status === 'at_risk').length,
+    stalled_cases: clients.filter((c) => c.health_status === 'stalled').length,
+    resolved_cases: resolved.length,
+    total_debt_eliminated: properties
+      .filter((p) => p.status === 'paid_off')
+      .reduce((sum, p) => sum + Number(p.value_eliminated ?? p.loan_balance ?? 0), 0),
+    properties_under_mgmt: properties.filter((p) => p.status === 'active').length,
+    avg_days_to_resolution: avgDays,
+    resolution_rate: clients.length > 0 ? (resolved.length / clients.length) * 100 : 0,
+    stage_counts,
+    attention: clients
+      .filter((c) => c.health_status !== 'on_track')
+      .sort((a, b) => (a.health_status === b.health_status ? 0 : a.health_status === 'stalled' ? -1 : 1))
+      .slice(0, 6)
+      .map((c) => ({
+        id: c.id,
+        name: c.name,
+        health_status: c.health_status,
+        stage: c.stage,
+        last_contact_at: c.last_contact_at,
+        overdue_task_count: c.overdue_task_count,
+      })),
   }
 }

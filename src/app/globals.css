@@ -1,5 +1,6 @@
 @import "tailwindcss";
 @import "tw-animate-css";
+@import "react-day-picker/style.css";
 
 @custom-variant dark (&:is(.dark *));
 
@@ -162,4 +163,26 @@
       width: var(--arc-progress, 100%);
     }
   }
+}
+
+/* Calendar task density dots (PRD §12.1) */
+.rdp-day_hasTasks .rdp-day_button,
+.rdp-day_hasTasks .rdp-button {
+  position: relative;
+}
+.rdp-day_hasTasks .rdp-day_button::after,
+.rdp-day_hasTasks .rdp-button::after {
+  content: '';
+  position: absolute;
+  bottom: 2px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 4px;
+  height: 4px;
+  border-radius: 9999px;
+  background: var(--primary);
+}
+.rdp-day_overdue .rdp-day_button::after,
+.rdp-day_overdue .rdp-button::after {
+  background: var(--destructive);
 }

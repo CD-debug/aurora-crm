@@ -2,13 +2,11 @@
 
 import Link from 'next/link'
 import { cn } from '@/lib/utils'
-import { ArrowUpRight, ArrowDownRight, Minus, Users, DollarSign, Clock, Target, TrendingUp } from 'lucide-react'
 import { AuroraArcStepper } from '@/components/shared'
 
 interface MetricCardProps {
   title: string
   value: string | number
-  change?: { value: number; label: string }
   icon: React.ReactNode
   href?: string
   color?: 'primary' | 'success' | 'warning' | 'danger' | 'info'
@@ -16,33 +14,22 @@ interface MetricCardProps {
 }
 
 const metricColors = {
-  primary: 'border-l-primary bg-primary/5',
-  success: 'border-l-green-500 bg-green-500/5',
-  warning: 'border-l-amber-500 bg-amber-500/5',
-  danger: 'border-l-red-500 bg-red-500/5',
-  info: 'border-l-blue-500 bg-blue-500/5',
+  primary: 'border-l-primary',
+  success: 'border-l-green-500',
+  warning: 'border-l-amber-500',
+  danger: 'border-l-red-500',
+  info: 'border-l-blue-500',
 }
 
-export function MetricCard({ title, value, change, icon, href, color = 'primary', description }: MetricCardProps) {
+export function MetricCard({ title, value, icon, href, color = 'primary', description }: MetricCardProps) {
   const content = (
-    <div className={cn('p-5 rounded-xl border transition-all hover:shadow-md', metricColors[color])}>
-      <div className="flex items-start justify-between">
-        <div className="flex-1">
-          <p className="text-sm font-medium text-muted-foreground">{title}</p>
-          <p className="text-3xl font-bold text-foreground mt-1 tabular-nums">{value}</p>
-          {description && <p className="text-xs text-muted-foreground mt-1">{description}</p>}
-          {change && (
-            <div className="flex items-center gap-1 mt-2">
-              <span className={cn('text-sm font-medium', change.value >= 0 ? 'text-green-600' : 'text-red-600')}>
-                {change.value >= 0 ? <ArrowUpRight className="w-3 h-3" /> : <ArrowDownRight className="w-3 h-3" />}
-                {Math.abs(change.value)}%
-              </span>
-              <span className="text-xs text-muted-foreground">{change.label}</span>
-            </div>
-          )}
-        </div>
-        <div className="p-3 rounded-lg bg-background border border-border">
-          {icon}
+    <div className={cn('p-4 rounded-lg border border-l-4 transition-colors hover:bg-muted/30', metricColors[color])}>
+      <div className="flex items-center gap-3">
+        <div className="text-muted-foreground">{icon}</div>
+        <div className="flex-1 min-w-0">
+          <p className="text-xs text-muted-foreground">{title}</p>
+          <p className="text-xl font-bold font-mono tabular-nums">{value}</p>
+          {description && <p className="text-xs text-muted-foreground mt-0.5">{description}</p>}
         </div>
       </div>
     </div>

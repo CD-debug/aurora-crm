@@ -1,492 +1,469 @@
 'use client'
 
-import { useState, useEffect } from 'react'
-import { useSearchParams, useRouter } from 'next/navigation'
-import { NavRail } from '@/components/shared/NavRail'
-import { Toaster } from '@/components/shared/toaster'
-import { PageHeader } from '@/components/shared/PageHeader'
-import { TaskStatusBadge } from '@/components/shared/badges'
-import { createClient } from '@/lib/supabase/client'
-import { format, differenceInDays, isBefore, startOfDay, parseISO } from 'date-fns'
-import { 
-  Calendar, ChevronDown, ChevronUp, Search, Filter, X, 
-  Plus, MoreHorizontal, Check, Clock, User, AlertTriangle, Trash2
+import { Suspense, useEffect, useMemo, useState } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { format, isSameDay, parseISO, startOfDay } from 'date-fns'
+import { toast } from 'sonner'
+import {
+  Calendar as CalendarIcon, CheckCircle, ChevronDown, ChevronRight,
+  Plus, Trash2, X,
 } from 'lucide-react'
-import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { Calendar } from '@/components/ui/calendar'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell, TableCaption } from '@/components/ui/table'
-import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator } from '@/components/ui/dropdown-menu'
-import { Sheet, SheetTrigger, SheetContent, SheetHeader, SheetTitle, SheetDescription, SheetFooter } from '@/components/ui/sheet'
-import { Textarea } from '@/components/ui/textarea'
-import { Popover, PopoverTrigger, PopoverContent } from '@/components/ui/popover'
-import { toast } from 'sonner'
-
-interface Task {
-  id: string
-  client_id: string
-  title: string
-  description: string | null
-  due_date: string
-  due_time: string | null
-  status: 'pending' | 'completed' | 'overdue'
-  completed_at: string | null
-  created_at: string
-  clients?: { name: string; state: string; health_status: string }
-}
-
-interface Client {
-  id: string
-  name: string
-}
-
-const STATUS_LABELS = {
-  pending: 'Upcoming',
-  overdue: 'Overdue',
-  completed: 'Completed',
-} as const
+import { NavRail } from '@/components/shared'
+import { createClient } from '@/lib/supabase/client'
+import { fetchClients, fetchTasks, invalidateAfterMutation } from '@/lib/data/client-queries'
+import { queryKeys } from '@/lib/data/query-keys'
+import { createTask, setTaskCompleted, updateTask, deleteTask } from '@/lib/data/mutations'
+import { taskStatus } from '@/lib/data/domain'
+import type { TaskWithClient } from '@/lib/data/types'
+import { cn } from '@/lib/utils'
 
 function TasksPageContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
-  
-  const [tasks, setTasks] = useState<Task[]>([])
-  const [clients, setClients] = useState<Client[]>([])
-  const [loading, setLoading] = useState(true)
-  const [sortConfig, setSortConfig] = useState<{ key: string; direction: 'asc' | 'desc' }>({ key: 'due_date', direction: 'asc' })
-  
-  const filters = {
-    clientId: searchParams.get('client') || '',
-    status: searchParams.get('status') || '',
-    dueDate: searchParams.get('dueDate') || '',
-    view: searchParams.get('view') || 'today-overdue',
-  }
+  const queryClient = useQueryClient()
+  const [supabase] = useState(() => createClient())
 
-  const [addTaskOpen, setAddTaskOpen] = useState(false)
-  const [expandedTaskId, setExpandedTaskId] = useState<string | null>(null)
-  const [newTask, setNewTask] = useState({
-    client_id: '', title: '', description: '', due_date: '', due_time: ''
+  const { data: tasks = [], isLoading } = useQuery({
+    queryKey: queryKeys.tasks.all,
+    queryFn: () => fetchTasks(supabase),
   })
-  const supabase = createClient()
+  const { data: clients = [] } = useQuery({
+    queryKey: queryKeys.clients.all,
+    queryFn: () => fetchClients(supabase),
+  })
 
-  useEffect(() => {
-    fetchData()
-  }, [filters.clientId, filters.status, filters.dueDate, filters.view])
+  const filterClient = searchParams.get('client') ?? ''
+  const filterStatus = searchParams.get('status') ?? ''
+  const filterDue = searchParams.get('due') ?? ''
+  const view = searchParams.get('view') === 'all' ? 'all' : 'focus'
 
-  const fetchData = async () => {
-    setLoading(true)
-    try {
-      const params = new URLSearchParams()
-      if (filters.clientId) params.set('clientId', filters.clientId)
-      if (filters.status) params.set('status', filters.status)
-      if (filters.dueDate) params.set('dueDate', filters.dueDate)
-      if (filters.view === 'today-overdue') {
-        const today = format(startOfDay(new Date()), 'yyyy-MM-dd')
-        params.set('dueDateFrom', '2020-01-01')
-        params.set('dueDateTo', today)
-      }
-      params.set('sort', sortConfig.key)
-      params.set('direction', sortConfig.direction)
-      
-      const [tasksRes, clientsRes] = await Promise.all([
-        fetch(`/api/tasks?${params.toString()}`),
-        fetch('/api/clients?sort=name&direction=asc')
-      ])
-      
-      if (tasksRes.ok) setTasks((await tasksRes.json()).tasks || [])
-      if (clientsRes.ok) setClients((await clientsRes.json()).clients || [])
-    } catch (error) {
-      console.error('Failed to fetch tasks:', error)
-      toast.error('Failed to load tasks')
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  const handleFilterChange = (key: string, value: string | null) => {
+  const setParams = (updates: Record<string, string | null>) => {
     const params = new URLSearchParams(searchParams.toString())
-    if (value) params.set(key, value)
-    else params.delete(key)
-    router.push(`/tasks?${params.toString()}`)
-  }
-
-  const handleSort = (key: string) => {
-    setSortConfig(prev => ({
-      key,
-      direction: prev.key === key && prev.direction === 'asc' ? 'desc' : 'asc'
-    }))
-  }
-
-  const handleAddTask = async (e: React.FormEvent) => {
-    e.preventDefault()
-    try {
-      const res = await fetch('/api/tasks', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(newTask)
-      })
-      if (res.ok) {
-        setAddTaskOpen(false)
-        setNewTask({ client_id: '', title: '', description: '', due_date: '', due_time: '' })
-        toast.success('Task created')
-        fetchData()
-      } else {
-        toast.error('Failed to create task')
-      }
-    } catch {
-      toast.error('Failed to create task')
+    for (const [k, v] of Object.entries(updates)) {
+      if (v) params.set(k, v)
+      else params.delete(k)
     }
+    router.replace(`/tasks?${params.toString()}`, { scroll: false })
   }
 
-  const handleCompleteTask = async (task: Task) => {
-    try {
-      const res = await fetch(`/api/tasks/${task.id}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status: 'completed', completed_at: new Date().toISOString() })
-      })
-      if (res.ok) {
-        setTasks(prev => prev.map(t => t.id === task.id ? { ...t, status: 'completed', completed_at: new Date().toISOString() } : t))
-        toast.success('Task completed')
-      } else {
-        toast.error('Failed to complete task')
-      }
-    } catch {
-      toast.error('Failed to complete task')
-    }
-  }
-
-  const handleTaskStatusChange = async (task: Task, status: Task['status']) => {
-    try {
-      const res = await fetch(`/api/tasks/${task.id}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status, completed_at: status === 'completed' ? new Date().toISOString() : null })
-      })
-      if (res.ok) {
-        setTasks(prev => prev.map(t => t.id === task.id ? { ...t, status, completed_at: status === 'completed' ? new Date().toISOString() : t.completed_at } : t))
-        toast.success(`Task marked as ${STATUS_LABELS[status]}`)
-      } else {
-        toast.error('Failed to update task')
-      }
-    } catch {
-      toast.error('Failed to update task')
-    }
-  }
+  const [selectedId, setSelectedId] = useState<string | null>(null)
+  const [showCalendar, setShowCalendar] = useState(false)
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setSelectedId(null) }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [])
 
   const today = startOfDay(new Date())
-  
-  const getTaskStatus = (task: Task): Task['status'] => {
-    if (task.status === 'completed') return 'completed'
-    const dueDate = startOfDay(parseISO(task.due_date))
-    return isBefore(dueDate, today) ? 'overdue' : 'pending'
+  const visible = useMemo(() => {
+    return tasks.filter((t) => {
+      const status = taskStatus(t, today)
+      if (filterClient && t.client_id !== filterClient) return false
+      if (filterStatus && status !== filterStatus) return false
+      if (filterDue) {
+        if (t.due_date !== filterDue) return false
+      } else if (!filterStatus && view === 'focus') {
+        if (status === 'completed') return false
+        if (startOfDay(parseISO(t.due_date)) > today) return false
+      }
+      return true
+    })
+  }, [tasks, filterClient, filterStatus, filterDue, view, today])
+
+  const { daysWithTasks, daysWithOverdue } = useMemo(() => {
+    const withTasks = new Set<string>()
+    const withOverdue = new Set<string>()
+    for (const t of tasks) {
+      if (t.completed_at) continue
+      withTasks.add(t.due_date)
+      if (taskStatus(t, today) === 'overdue') withOverdue.add(t.due_date)
+    }
+    return {
+      daysWithTasks: [...withTasks].map((d) => parseISO(d)),
+      daysWithOverdue: [...withOverdue].map((d) => parseISO(d)),
+    }
+  }, [tasks, today])
+
+  const selectedTask = tasks.find((t) => t.id === selectedId) ?? null
+  const counts = useMemo(() => ({
+    overdue: tasks.filter((t) => taskStatus(t, today) === 'overdue').length,
+    today: tasks.filter((t) => !t.completed_at && isSameDay(parseISO(t.due_date), today)).length,
+  }), [tasks, today])
+
+  const [quickTitle, setQuickTitle] = useState('')
+  const [quickClient, setQuickClient] = useState('')
+  const [saving, setSaving] = useState(false)
+
+  const effectiveClient = filterClient || quickClient || (clients.length === 1 ? clients[0].id : '')
+
+  const submitQuickAdd = async () => {
+    const dueDate = filterDue || format(today, 'yyyy-MM-dd')
+    if (!quickTitle.trim() || !effectiveClient || saving) return
+    setSaving(true)
+    try {
+      await createTask({ client_id: effectiveClient, title: quickTitle.trim(), due_date: dueDate })
+      await invalidateAfterMutation(queryClient, effectiveClient)
+      setQuickTitle('')
+      toast.success('Task created')
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Couldn't create this task. Try again.")
+    } finally {
+      setSaving(false)
+    }
   }
 
-  const displayTasks = tasks.map(t => ({ ...t, status: getTaskStatus(t) }))
+  const toggleComplete = async (task: TaskWithClient) => {
+    const completing = !task.completed_at
+    try {
+      await setTaskCompleted(task.id, task.client_id, completing)
+      await invalidateAfterMutation(queryClient, task.client_id)
+      toast.success(completing ? 'Task completed' : 'Task reopened')
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Couldn't update this task.")
+    }
+  }
 
-  const sortedTasks = [...displayTasks].sort((a, b) => {
-    const aVal = a[sortConfig.key as keyof Task]
-    const bVal = b[sortConfig.key as keyof Task]
-    if (aVal == null && bVal == null) return 0
-    if (aVal == null) return 1
-    if (bVal == null) return -1
-    if (aVal < bVal) return sortConfig.direction === 'asc' ? -1 : 1
-    if (aVal > bVal) return sortConfig.direction === 'asc' ? 1 : -1
-    return 0
-  })
+  const reschedule = async (task: TaskWithClient, newDate: string) => {
+    if (!newDate) return
+    try {
+      await updateTask(task.id, task.client_id, { due_date: newDate })
+      await invalidateAfterMutation(queryClient, task.client_id)
+      toast.success(`Rescheduled to ${format(parseISO(newDate), 'MMM d, yyyy')}`)
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Couldn't reschedule this task.")
+    }
+  }
 
-  const getStatusColor = (status: Task['status']) => {
-    if (status === 'overdue') return 'bg-red-100 text-red-800 border-red-200'
-    if (status === 'completed') return 'bg-green-100 text-green-800 border-green-200'
-    return 'bg-blue-100 text-blue-800 border-blue-200'
+  const removeTask = async (task: TaskWithClient) => {
+    try {
+      await deleteTask(task.id, task.client_id)
+      await invalidateAfterMutation(queryClient, task.client_id)
+      if (selectedId === task.id) setSelectedId(null)
+      toast.success('Task deleted')
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Couldn't delete this task.")
+    }
+  }
+
+  const hasFilters = !!(filterClient || filterStatus || filterDue)
+
+  const formatDue = (dateStr: string) => {
+    const d = startOfDay(parseISO(dateStr))
+    if (isSameDay(d, today)) return 'Today'
+    const diffDays = Math.round((d.getTime() - today.getTime()) / (1000 * 60 * 60 * 24))
+    if (diffDays === 1) return 'Tomorrow'
+    if (diffDays === -1) return 'Yesterday'
+    return format(d, 'MMM d')
   }
 
   return (
     <div className="flex h-screen bg-background">
       <NavRail />
       <main className="flex-1 ml-16 overflow-auto transition-all duration-200 lg:ml-64">
-        <Toaster />
-        
         <div className="container mx-auto px-4 py-6">
           {/* Header */}
-          <PageHeader
-            title="Tasks"
-            subtitle="Manage follow-ups and appointments across all cases"
-            action={
-              <Sheet open={addTaskOpen} onOpenChange={setAddTaskOpen}>
-                <SheetTrigger><Button>
-                    <Plus className="w-4 h-4 mr-2" />
-                    Add Task
-                  </Button>
-                </SheetTrigger>
-                <SheetContent side="right" className="w-full max-w-md">
-                  <SheetHeader>
-                    <SheetTitle>Create New Task</SheetTitle>
-                    <SheetDescription>Schedule a follow-up or action item</SheetDescription>
-                  </SheetHeader>
-                  <form onSubmit={handleAddTask} className="space-y-4 p-4">
-                    <div className="space-y-2">
-                      <label className="text-sm font-medium">Client *</label>
-                      <Select value={newTask.client_id || ''} onValueChange={v => setNewTask({...newTask, client_id: v || ''})}>
-                        <SelectTrigger className="w-full"><SelectValue placeholder="Select client" /></SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="">Select client</SelectItem>
-                          {clients.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div className="space-y-2">
-                      <label className="text-sm font-medium">Title *</label>
-                      <Input value={newTask.title} onChange={e => setNewTask({...newTask, title: e.target.value})} required />
-                    </div>
-                    <div className="space-y-2">
-                      <label className="text-sm font-medium">Description</label>
-                      <Textarea value={newTask.description} onChange={e => setNewTask({...newTask, description: e.target.value})} rows={3} />
-                    </div>
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="space-y-2">
-                        <label className="text-sm font-medium">Due Date *</label>
-                        <Input type="date" value={newTask.due_date} onChange={e => setNewTask({...newTask, due_date: e.target.value})} required min={format(today, 'yyyy-MM-dd')} />
-                      </div>
-                      <div className="space-y-2">
-                        <label className="text-sm font-medium">Due Time</label>
-                        <Input type="time" value={newTask.due_time} onChange={e => setNewTask({...newTask, due_time: e.target.value})} />
-                      </div>
-                    </div>
-                    <SheetFooter>
-                      <Button type="submit" className="w-full">Create Task</Button>
-                    </SheetFooter>
-                  </form>
-                </SheetContent>
-              </Sheet>
-            }
-          />
-          
-          {/* Filters */}
-          <div className="mb-4 p-4 rounded-lg border bg-card sticky top-0 z-10 bg-background/95 backdrop-blur">
-            <div className="flex flex-wrap items-center gap-4">
-              <div className="relative flex-1 min-w-[200px]">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                <Input
-                  placeholder="Filter tasks..."
-                  value={filters.clientId ? '' : ''}
-                  onChange={e => {
-                    // Client filter handled by select
-                  }}
-                  className="pl-10"
-                />
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
+            <div>
+              <h1 className="text-3xl font-heading font-semibold tracking-tight">Tasks</h1>
+              <p className="text-muted-foreground mt-1">
+                {counts.overdue > 0
+                  ? <><span className="text-red-600 font-medium">{counts.overdue} overdue</span> · {counts.today} due today</>
+                  : counts.today > 0
+                    ? <>{counts.today} due today</>
+                    : 'All cases on track — nothing overdue'}
+              </p>
+            </div>
+            <Button variant="ghost" size="sm" className="gap-1.5 w-fit" onClick={() => setShowCalendar(!showCalendar)}>
+              <CalendarIcon className="w-4 h-4" />
+              {showCalendar ? 'Hide calendar' : 'Show calendar'}
+            </Button>
+          </div>
+
+          {/* Calendar — collapsed by default */}
+          {showCalendar && (
+            <div className="mb-6 p-4 rounded-lg border bg-card">
+              <Calendar
+                mode="single"
+                selected={filterDue ? parseISO(filterDue) : undefined}
+                onSelect={(day) => setParams({ due: day ? format(day, 'yyyy-MM-dd') : null, status: null, view: null })}
+                modifiers={{ hasTasks: daysWithTasks, hasOverdue: daysWithOverdue }}
+                modifiersClassNames={{ hasTasks: 'aurora-day-tasks', hasOverdue: 'aurora-day-overdue' }}
+              />
+              <div className="flex items-center gap-4 px-2 pt-2 text-xs text-muted-foreground">
+                <span className="flex items-center gap-1.5"><span className="w-1.5 h-1.5 rounded-full bg-primary inline-block" /> tasks due</span>
+                <span className="flex items-center gap-1.5"><span className="w-1.5 h-1.5 rounded-full bg-red-500 inline-block" /> overdue</span>
               </div>
-              <Select value={filters.clientId} onValueChange={v => handleFilterChange('client', v || '')}>
-                <SelectTrigger className="w-[200px]"><SelectValue placeholder="All Clients" /></SelectTrigger>
+            </div>
+          )}
+
+          {/* Filter bar */}
+          <div className="mb-4 p-4 rounded-lg border bg-card">
+            <div className="flex flex-wrap items-center gap-3">
+              <div className="flex rounded-md border overflow-hidden text-sm">
+                <button
+                  onClick={() => setParams({ view: null, status: null, due: null })}
+                  className={cn('px-3 py-1.5 font-medium transition-colors', view === 'focus' && !filterStatus && !filterDue ? 'bg-primary text-primary-foreground' : 'hover:bg-muted')}
+                >
+                  Today
+                </button>
+                <button
+                  onClick={() => setParams({ view: 'all', status: null, due: null })}
+                  className={cn('px-3 py-1.5 font-medium transition-colors', view === 'all' || filterStatus || filterDue ? 'bg-primary text-primary-foreground' : 'hover:bg-muted')}
+                >
+                  All
+                </button>
+              </div>
+
+              <Select value={filterStatus || 'any'} onValueChange={(v) => setParams({ status: v === 'any' ? null : v })}>
+                <SelectTrigger className="w-[130px]" aria-label="Filter by status"><SelectValue /></SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">All Clients</SelectItem>
-                  {clients.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
-                </SelectContent>
-              </Select>
-              <Select value={filters.status} onValueChange={v => handleFilterChange('status', v)}>
-                <SelectTrigger className="w-[150px]"><SelectValue placeholder="All Status" /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="">All Status</SelectItem>
+                  <SelectItem value="any">All Status</SelectItem>
                   <SelectItem value="overdue">Overdue</SelectItem>
-                  <SelectItem value="pending">Upcoming</SelectItem>
+                  <SelectItem value="upcoming">Upcoming</SelectItem>
                   <SelectItem value="completed">Completed</SelectItem>
                 </SelectContent>
               </Select>
-              <Popover>
-                <PopoverTrigger><Button variant="outline" className="whitespace-nowrap">
-                    <Calendar className="w-4 h-4 mr-2" />
-                    Due Date
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-auto p-2">
-                  <Input type="date" value={filters.dueDate} onChange={e => handleFilterChange('dueDate', e.target.value)} />
-                </PopoverContent>
-              </Popover>
-              <Select value={filters.view} onValueChange={v => handleFilterChange('view', v)}>
-                <SelectTrigger className="w-[180px]"><SelectValue placeholder="View" /></SelectTrigger>
+
+              <Select value={filterClient || 'any'} onValueChange={(v) => setParams({ client: v === 'any' ? null : v })}>
+                <SelectTrigger className="w-[160px]" aria-label="Filter by client"><SelectValue /></SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="today-overdue">Today + Overdue</SelectItem>
-                  <SelectItem value="all">All Upcoming</SelectItem>
+                  <SelectItem value="any">All Clients</SelectItem>
+                  {clients.map((c) => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
                 </SelectContent>
               </Select>
-              {(filters.clientId || filters.status || filters.dueDate || filters.view !== 'today-overdue') && (
-                <Button variant="ghost" size="sm" onClick={() => router.push('/tasks')}>
+
+              {filterDue && (
+                <span className="flex items-center gap-1.5 text-sm bg-muted rounded-md px-2.5 py-1.5">
+                  <CalendarIcon className="w-3.5 h-3.5" />
+                  {format(parseISO(filterDue), 'MMM d, yyyy')}
+                  <button onClick={() => setParams({ due: null })} className="hover:text-foreground"><X className="w-3.5 h-3.5" /></button>
+                </span>
+              )}
+
+              {hasFilters && (
+                <Button variant="ghost" size="sm" onClick={() => router.replace('/tasks')}>
                   <X className="w-4 h-4 mr-1" />
-                  Clear Filters
+                  Clear
                 </Button>
               )}
             </div>
           </div>
 
-          {/* Task Table */}
-          <div className="rounded-lg border bg-card overflow-hidden">
-            {loading ? (
-              <div className="p-8 text-center text-muted-foreground">Loading tasks...</div>
-            ) : sortedTasks.length === 0 ? (
-              <div className="p-8 text-center">
-                <Calendar className="w-12 h-12 mx-auto text-muted-foreground/50 mb-4" />
-                <p className="text-muted-foreground mb-4">
-                  {filters.view === 'today-overdue' 
-                    ? 'Nothing due today. Add a task to keep cases moving.' 
-                    : 'No tasks found matching your filters.'}
-                </p>
-                <Button onClick={() => setAddTaskOpen(true)}>
-                  <Plus className="w-4 h-4 mr-2" />
-                  Add Task
-                </Button>
-              </div>
-            ) : (
-              <>
-                <Table>
-                  <TableHeader>
-                    <TableRow className="bg-muted/50">
-                      <TableHead className="cursor-pointer hover:bg-muted" onClick={() => handleSort('due_date')}>
-                        <div className="flex items-center gap-1">
-                          Due Date
-                          {sortConfig.key === 'due_date' && (sortConfig.direction === 'asc' ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />)}
-                        </div>
-                      </TableHead>
-                      <TableHead className="cursor-pointer hover:bg-muted" onClick={() => handleSort('due_time')}>Time</TableHead>
-                      <TableHead className="cursor-pointer hover:bg-muted" onClick={() => handleSort('clients.name')}>
-                        <div className="flex items-center gap-1">
-                          Client
-                          {sortConfig.key === 'clients.name' && (sortConfig.direction === 'asc' ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />)}
-                        </div>
-                      </TableHead>
-                      <TableHead>Task</TableHead>
-                      <TableHead>Status</TableHead>
-                      <TableHead className="w-12"></TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {sortedTasks.map((task) => {
-                      const status = getTaskStatus(task)
-                      const isExpanded = expandedTaskId === task.id
-                      
-                      return (
-                        <>
-                          <TableRow 
-                            key={task.id} 
-                            className={cn(
-                              'cursor-pointer transition-colors',
-                              isExpanded && 'bg-accent/50',
-                              status === 'overdue' && 'bg-red-50',
-                              status === 'completed' && 'opacity-60'
-                            )}
-                            onClick={() => setExpandedTaskId(isExpanded ? null : task.id)}
-                          >
-                            <TableCell className="font-mono font-medium">
-                              {format(parseISO(task.due_date), 'MMM d, yyyy')}
-                              {status === 'overdue' && (
-                                <AlertTriangle className="w-3 h-3 text-red-500 ml-1 inline" />
-                              )}
-                            </TableCell>
-                            <TableCell>
-                              {task.due_time ? format(parseISO(`2000-01-01T${task.due_time}`), 'h:mm a') : '—'}
-                            </TableCell>
-                            <TableCell>
-                              <div className="flex items-center gap-2">
-                                <User className="w-4 h-4 text-muted-foreground" />
-                                <span className="font-medium">{task.clients?.name || 'Unknown'}</span>
-                                <span className="text-xs text-muted-foreground">{task.clients?.state}</span>
-                              </div>
-                            </TableCell>
-                            <TableCell className="max-w-[300px] truncate">{task.title}</TableCell>
-                            <TableCell>
-                              <TaskStatusBadge status={status} />
-                            </TableCell>
-                            <TableCell>
-                              <DropdownMenu>
-                                <DropdownMenuTrigger><Button variant="ghost" size="icon" className="h-8 w-8">
-                                    <MoreHorizontal className="w-4 h-4" />
-                                  </Button>
-                                </DropdownMenuTrigger>
-                                <DropdownMenuContent align="end">
-                                  <DropdownMenuItem 
-                                    onClick={() => router.push(`/clients/${task.client_id}#tasks`)}
-                                  >
-                                    <User className="w-4 h-4 mr-2" />
-                                    View Client
-                                  </DropdownMenuItem>
-                                  {status !== 'completed' && (
-                                    <DropdownMenuItem onClick={() => handleCompleteTask(task)}>
-                                      <Check className="w-4 h-4 mr-2" />
-                                      Mark Complete
-                                    </DropdownMenuItem>
-                                  )}
-                                  {status === 'overdue' && (
-                                    <DropdownMenuItem onClick={() => handleTaskStatusChange(task, 'pending')}>
-                                      <Clock className="w-4 h-4 mr-2" />
-                                      Mark as Upcoming
-                                    </DropdownMenuItem>
-                                  )}
-                                  <DropdownMenuSeparator />
-                                  <DropdownMenuItem 
-                                    className="text-red-600"
-                                    onClick={async () => {
-                                      try {
-                                        await fetch(`/api/tasks/${task.id}`, { method: 'DELETE' })
-                                        setTasks(prev => prev.filter(t => t.id !== task.id))
-                                        toast.success('Task deleted')
-                                      } catch {
-                                        toast.error('Failed to delete task')
-                                      }
-                                    }}
-                                  >
-                                    <Trash2 className="w-4 h-4 mr-2" />
-                                    Delete
-                                  </DropdownMenuItem>
-                                </DropdownMenuContent>
-                              </DropdownMenu>
-                            </TableCell>
-                          </TableRow>
-                          {isExpanded && (
-                            <TableRow className="bg-muted/30">
-                              <TableCell colSpan={6} className="p-4">
-                                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
-                                  <div>
-                                    <p className="font-medium text-muted-foreground">Description</p>
-                                    <p className="mt-1">{task.description || 'No description'}</p>
-                                  </div>
-                                  <div>
-                                    <p className="font-medium text-muted-foreground">Created</p>
-                                    <p className="mt-1">{format(parseISO(task.created_at), 'MMM d, yyyy h:mm a')}</p>
-                                  </div>
-                                  <div>
-                                    <p className="font-medium text-muted-foreground">Status History</p>
-                                    <p className="mt-1">
-                                      {status === 'completed' && task.completed_at && (
-                                        <>Completed: {format(parseISO(task.completed_at), 'MMM d, yyyy h:mm a')}</>
-                                      )}
-                                    </p>
-                                  </div>
-                                </div>
-                              </TableCell>
-                            </TableRow>
-                          )}
-                        </>
-                      )
-                    })}
-                  </TableBody>
-                </Table>
-                <TableCaption className="p-4 text-sm text-muted-foreground">
-                  {sortedTasks.length} task{sortedTasks.length !== 1 ? 's' : ''} • Click row to expand • Click client name to view case
-                </TableCaption>
-              </>
-            )}
+          {/* Quick-add */}
+          <div className="mb-4 p-4 rounded-lg border bg-card">
+            <div className="flex items-center gap-3">
+              {!filterClient && clients.length > 1 && (
+                <Select value={quickClient} onValueChange={(v) => setQuickClient(v ?? '')}>
+                  <SelectTrigger className="w-[160px]" aria-label="Task client"><SelectValue placeholder="Client…" /></SelectTrigger>
+                  <SelectContent>
+                    {clients.map((c) => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              )}
+              <Input
+                value={quickTitle}
+                onChange={(e) => setQuickTitle(e.target.value)}
+                onKeyDown={(e) => { if (e.key === 'Enter') submitQuickAdd() }}
+                placeholder="New task — press Enter to add"
+                className="flex-1 min-w-[200px]"
+              />
+              <Button
+                onClick={submitQuickAdd}
+                disabled={saving || !quickTitle.trim() || !effectiveClient}
+              >
+                <Plus className="w-4 h-4 mr-1" />
+                Add
+              </Button>
+            </div>
           </div>
+
+          {/* Task list */}
+          {isLoading ? (
+            <div className="rounded-lg border bg-card p-4 space-y-3" aria-label="Loading tasks">
+              {Array.from({ length: 5 }).map((_, i) => (
+                <div key={i} className="h-12 rounded-md bg-muted/60 animate-pulse" />
+              ))}
+            </div>
+          ) : visible.length === 0 ? (
+            <div className="rounded-lg border bg-card p-10 text-center">
+              {hasFilters ? (
+                <>
+                  <p className="text-muted-foreground mb-4">No tasks match these filters.</p>
+                  <Button variant="outline" onClick={() => router.replace('/tasks')}>Clear filters</Button>
+                </>
+              ) : (
+                <>
+                  <p className="text-muted-foreground mb-4">
+                    {view === 'focus' ? 'Nothing due today.' : 'No tasks yet.'}
+                  </p>
+                  {view === 'focus' && (
+                    <Button variant="outline" onClick={() => setParams({ view: 'all' })}>View all tasks</Button>
+                  )}
+                </>
+              )}
+            </div>
+          ) : (
+            <div className="rounded-lg border bg-card overflow-hidden">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="bg-muted/50 border-b">
+                    <th className="text-left px-4 py-2.5 font-medium text-muted-foreground w-8" />
+                    <th className="text-left px-4 py-2.5 font-medium text-muted-foreground">Task</th>
+                    <th className="text-left px-4 py-2.5 font-medium text-muted-foreground hidden sm:table-cell">Client</th>
+                    <th className="text-right px-4 py-2.5 font-medium text-muted-foreground w-24">Due</th>
+                    <th className="w-10" />
+                  </tr>
+                </thead>
+                <tbody className="divide-y">
+                  {visible.map((task) => {
+                    const status = taskStatus(task, today)
+                    const expanded = selectedId === task.id
+                    const overdue = status === 'overdue'
+                    const completed = status === 'completed'
+                    const dueToday = isSameDay(parseISO(task.due_date), today)
+
+                    return (
+                      <tr key={task.id} className={cn(completed && 'opacity-50')}>
+                        <td className="px-4 py-2.5 align-middle">
+                          <button
+                            onClick={(e) => { e.stopPropagation(); toggleComplete(task) }}
+                            aria-label={completed ? 'Reopen task' : 'Complete task'}
+                          >
+                            {completed
+                              ? <CheckCircle className="w-4 h-4 text-green-600" />
+                              : <span className="block w-4 h-4 rounded-full border-[1.5px] border-muted-foreground/40 hover:border-primary transition-colors" />}
+                          </button>
+                        </td>
+                        <td
+                          className={cn(
+                            'px-4 py-2.5 cursor-pointer hover:bg-muted/40 transition-colors',
+                            expanded && 'bg-muted/40'
+                          )}
+                          onClick={() => setSelectedId(expanded ? null : task.id)}
+                        >
+                          <span className={cn('font-medium block truncate', completed && 'line-through text-muted-foreground')}>
+                            {task.title}
+                          </span>
+                          {task.description && (
+                            <span className="text-xs text-muted-foreground block truncate mt-0.5">{task.description}</span>
+                          )}
+                        </td>
+                        <td className="px-4 py-2.5 hidden sm:table-cell">
+                          <button
+                            onClick={(e) => { e.stopPropagation(); router.push(`/clients/${task.client_id}#tasks`) }}
+                            className="text-muted-foreground hover:text-primary hover:underline text-xs"
+                          >
+                            {task.clients?.name ?? '—'}
+                          </button>
+                        </td>
+                        <td className="px-4 py-2.5 text-right">
+                          <span className={cn(
+                            'text-xs font-mono tabular-nums',
+                            overdue && 'text-red-600 font-semibold',
+                            dueToday && !completed && 'text-amber-600 font-medium',
+                            completed && 'text-muted-foreground'
+                          )}>
+                            {formatDue(task.due_date)}
+                          </span>
+                        </td>
+                        <td className="px-2 py-2.5 text-right">
+                          <button
+                            onClick={(e) => { e.stopPropagation(); setSelectedId(expanded ? null : task.id) }}
+                            className="p-1 hover:bg-muted rounded transition-colors"
+                          >
+                            {expanded
+                              ? <ChevronDown className="w-4 h-4 text-muted-foreground" />
+                              : <ChevronRight className="w-4 h-4 text-muted-foreground" />}
+                          </button>
+                        </td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+
+              {/* Expanded detail — outside the table for full-width */}
+              {selectedTask && (() => {
+                const status = taskStatus(selectedTask, today)
+                const completed = status === 'completed'
+                return (
+                  <div className="border-t bg-muted/20 px-6 py-4">
+                    <div className="flex items-start justify-between gap-4">
+                      <div className="space-y-2 flex-1 min-w-0">
+                        <h3 className="font-semibold">{selectedTask.title}</h3>
+                        {selectedTask.description && (
+                          <p className="text-sm text-muted-foreground leading-relaxed">{selectedTask.description}</p>
+                        )}
+                        <div className="flex items-center gap-4 text-xs text-muted-foreground">
+                          <span>Created {format(parseISO(selectedTask.created_at), 'MMM d, yyyy')}</span>
+                          {selectedTask.due_time && <span className="font-mono">{selectedTask.due_time.slice(0, 5)}</span>}
+                          {selectedTask.completed_at && <span>Done {format(parseISO(selectedTask.completed_at), 'MMM d, yyyy')}</span>}
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2 flex-shrink-0">
+                        <Button
+                          size="sm"
+                          variant={completed ? 'outline' : 'default'}
+                          onClick={() => toggleComplete(selectedTask)}
+                        >
+                          {completed ? 'Reopen' : 'Mark done'}
+                        </Button>
+                        <input
+                          type="date"
+                          defaultValue={selectedTask.due_date}
+                          onChange={(e) => reschedule(selectedTask, e.target.value)}
+                          className="h-7 text-xs border border-input rounded-md px-2 bg-background text-foreground"
+                        />
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="text-muted-foreground hover:text-red-600"
+                          onClick={() => removeTask(selectedTask)}
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </Button>
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => router.push(`/clients/${selectedTask.client_id}#tasks`)}
+                      className="text-xs text-primary hover:underline mt-3 inline-block"
+                    >
+                      Open case →
+                    </button>
+                  </div>
+                )
+              })()}
+            </div>
+          )}
+
+          <p className="text-sm text-muted-foreground mt-2 px-1">
+            {visible.length} task{visible.length !== 1 ? 's' : ''} · click a row to expand
+          </p>
         </div>
       </main>
     </div>
   )
 }
 
-import { Suspense } from 'react'
-
 export default function TasksPage() {
   return (
-    <Suspense fallback={<div className="container mx-auto px-4 py-8 text-center text-muted-foreground">Loading tasks...</div>}>
+    <Suspense fallback={
+      <div className="flex h-screen bg-background">
+        <NavRail />
+        <main className="flex-1 ml-16 lg:ml-64 p-8">
+          <div className="container mx-auto px-4 py-6 space-y-3">
+            {Array.from({ length: 5 }).map((_, i) => (
+              <div key={i} className="h-12 rounded-md bg-muted/60 animate-pulse" />
+            ))}
+          </div>
+        </main>
+      </div>
+    }>
       <TasksPageContent />
     </Suspense>
   )
