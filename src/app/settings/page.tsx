@@ -1,4 +1,4 @@
-import { NavRail } from '@/components/shared'
+import { NavRail, Breadcrumb } from '@/components/shared'
 import { GeneralSettings } from './general-settings'
 import { CsvImportExport } from './csv-import-export'
 import { LeadIngestion } from './lead-ingestion'
@@ -7,19 +7,20 @@ export const metadata = { title: 'Settings — Aurora CRM' }
 
 export default function SettingsPage() {
   return (
-    <div className="flex h-screen bg-background">
+    <div className="flex min-h-screen bg-background">
       <NavRail />
       <main className="flex-1 ml-16 overflow-auto">
-        <div className="container mx-auto px-6 py-8">
-          <div className="mb-8">
-            <h1 className="text-3xl font-heading font-semibold tracking-tight">Settings</h1>
-            <p className="text-muted-foreground mt-1">Configure your Aurora CRM workspace</p>
+        <header className="border-b border-border bg-background/95 backdrop-blur sticky top-0 z-30">
+          <div className="container mx-auto px-4 py-3">
+            <Breadcrumb items={[{ label: 'Settings' }]} className="mb-1" />
+            <h1 className="text-2xl font-heading font-semibold">Settings</h1>
+            <p className="text-sm text-muted-foreground mt-0.5">Configure your Aurora CRM workspace.</p>
           </div>
-          <div className="space-y-6">
-            <GeneralSettings />
-            <CsvImportExport />
-            <LeadIngestion />
-          </div>
+        </header>
+        <div className="container mx-auto px-4 py-6 space-y-6">
+          <GeneralSettings />
+          <CsvImportExport />
+          <LeadIngestion />
         </div>
       </main>
     </div>
