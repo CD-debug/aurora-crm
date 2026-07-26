@@ -7,7 +7,7 @@ import { Stagger, FadeUp, HoverLift, CountUp } from '@/components/shared/motion'
 import type { DashboardData } from '@/lib/data/types'
 import { STAGE_LABELS } from '@/lib/data/domain'
 import {
-  DollarSign, Users, AlertTriangle, CheckCircle, Clock, Target,
+  DollarSign, Users, AlertTriangle, AlertCircle, CheckCircle, Clock, Target,
   TrendingUp,
 } from 'lucide-react'
 
@@ -110,7 +110,7 @@ export function DashboardView({ data }: { data: DashboardData }) {
           <MetricTile icon={<Users className="w-5 h-5" />} title="Total Cases" value={data.total_cases} numericValue={data.total_cases} href="/clients" color="primary" />
           <MetricTile icon={<Target className="w-5 h-5" />} title="Active" value={data.active_cases} numericValue={data.active_cases} href="/clients?stage=active" color="info" delay={0.05} />
           <MetricTile icon={<CheckCircle className="w-5 h-5" />} title="Resolved" value={data.resolved_cases} numericValue={data.resolved_cases} href="/clients?stage=resolved" color="success" delay={0.1} />
-          <MetricTile icon={<Clock className="w-5 h-5" />} title="Avg. Time" value={data.avg_days_to_resolution != null ? `${Math.round(data.avg_days_to_resolution)} days` : '—'} href="/clients?stage=resolved" color="info" delay={0.15} />
+          <MetricTile icon={<Clock className="w-5 h-5" />} title="Avg. Time" value={data.avg_days_to_resolution != null ? `${Math.round(data.avg_days_to_resolution)} days` : '—'} color="info" delay={0.15} />
         </div>
       </FadeUp>
 
@@ -118,7 +118,7 @@ export function DashboardView({ data }: { data: DashboardData }) {
       <FadeUp>
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
           <MetricTile icon={<AlertTriangle className="w-5 h-5" />} title="At Risk" value={data.at_risk_cases} numericValue={data.at_risk_cases} href="/clients?health=at_risk" color="danger" delay={0.2} />
-          <MetricTile icon={<AlertTriangle className="w-5 h-5" />} title="Stalled" value={data.stalled_cases} numericValue={data.stalled_cases} href="/clients?health=stalled" color="warning" delay={0.25} />
+          <MetricTile icon={<AlertCircle className="w-5 h-5" />} title="Stalled" value={data.stalled_cases} numericValue={data.stalled_cases} href="/clients?health=stalled" color="warning" delay={0.25} />
           <MetricTile icon={<DollarSign className="w-5 h-5" />} title="Debt Eliminated" value={`$${Number(data.total_debt_eliminated).toLocaleString()}`} numericValue={Number(data.total_debt_eliminated)} color="success" delay={0.3} />
           <MetricTile icon={<TrendingUp className="w-5 h-5" />} title="Resolution Rate" value={`${data.resolution_rate.toFixed(1)}%`} numericValue={Math.round(data.resolution_rate)} color="success" delay={0.35} />
         </div>

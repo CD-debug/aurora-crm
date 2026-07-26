@@ -192,7 +192,10 @@ function TasksPageContent() {
                 selected={filterDue ? parseISO(filterDue) : undefined}
                 onSelect={(day) => setParams({ due: day ? format(day, 'yyyy-MM-dd') : null, status: null, view: null })}
                 modifiers={{ hasTasks: daysWithTasks, hasOverdue: daysWithOverdue }}
-                modifiersClassNames={{ hasTasks: 'aurora-day-tasks', hasOverdue: 'aurora-day-overdue' }}
+                modifiersClassNames={{
+                  hasTasks: 'rdp-day_hasTasks',
+                  hasOverdue: 'rdp-day_overdue',
+                }}
               />
               <div className="flex items-center gap-4 px-2 pt-2 text-xs text-muted-foreground">
                 <span className="flex items-center gap-1.5"><span className="w-1.5 h-1.5 rounded-full bg-primary inline-block" /> tasks due</span>
@@ -272,6 +275,10 @@ function TasksPageContent() {
                 placeholder="New task — press Enter to add"
                 className="flex-1 min-w-[200px]"
               />
+              <span className="hidden sm:inline-flex text-xs text-muted-foreground items-center gap-1 whitespace-nowrap">
+                <CalendarIcon className="w-3 h-3" />
+                Due {filterDue ? format(parseISO(filterDue), 'MMM d') : format(today, 'MMM d')}
+              </span>
               <Button
                 onClick={submitQuickAdd}
                 disabled={saving || !quickTitle.trim() || !effectiveClient}
@@ -336,7 +343,7 @@ function TasksPageContent() {
                           >
                             {completed
                               ? <CheckCircle className="w-4 h-4 text-green-600" />
-                              : <span className="block w-4 h-4 rounded-full border-[1.5px] border-muted-foreground/40 hover:border-primary transition-colors" />}
+                              : <span className="block w-4 h-4 rounded border-[1.5px] border-muted-foreground/40 hover:border-primary transition-colors" />}
                           </button>
                         </td>
                         <td

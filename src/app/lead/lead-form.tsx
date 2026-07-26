@@ -51,7 +51,7 @@ export function LeadForm() {
       <div className="grid grid-cols-2 gap-4">
         <div>
           <label className="text-sm font-medium">State</label>
-          <input name="state" required maxLength={2} className="mt-1 w-full rounded-lg border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring" />
+          <input name="state" required maxLength={2} placeholder="FL" className="mt-1 w-full rounded-lg border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring" />
         </div>
         <div>
           <label className="text-sm font-medium">ZIP</label>

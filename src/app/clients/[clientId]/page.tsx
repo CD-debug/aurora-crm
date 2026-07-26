@@ -418,7 +418,7 @@ export default function Client360Page() {
                   initial="hidden"
                   animate="visible"
                   variants={{ visible: { transition: { staggerChildren: 0.05 } } }}
-                  className="grid grid-cols-2 md:grid-cols-4 gap-4"
+                  className="grid grid-cols-2 md:grid-cols-3 gap-4"
                 >
                   <motion.div variants={{ hidden: { opacity: 0, y: 12 }, visible: { opacity: 1, y: 0 } }}><StatCard label="Days in Stage" value={daysSince(client.stage_entered_at)} icon={<Clock className="w-4 h-4" />} /></motion.div>
                   <motion.div variants={{ hidden: { opacity: 0, y: 12 }, visible: { opacity: 1, y: 0 } }}><StatCard label="Total Days in Process" value={daysSince(client.case_opened_at)} icon={<Calendar className="w-4 h-4" />} /></motion.div>
@@ -588,7 +588,7 @@ export default function Client360Page() {
                                 </span>
                                 <button
                                   onClick={() => setDeleteTarget({ kind: 'note', id: note.id, label: note.content.slice(0, 60) })}
-                                  className="ml-auto opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-red-600 transition-all"
+                                  className="ml-auto opacity-70 md:opacity-0 md:group-hover:opacity-100 text-muted-foreground hover:text-red-600 transition-all"
                                   aria-label="Delete note"
                                   title="Delete note"
                                 >
@@ -695,7 +695,7 @@ export default function Client360Page() {
                                 </span>
                                 <button
                                   onClick={() => setDeleteTarget({ kind: 'task', id: task.id, label: task.title })}
-                                  className="ml-auto opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-red-600 transition-all"
+                                  className="ml-auto opacity-70 md:opacity-0 md:group-hover:opacity-100 text-muted-foreground hover:text-red-600 transition-all"
                                   aria-label="Delete task"
                                   title="Delete task"
                                 >

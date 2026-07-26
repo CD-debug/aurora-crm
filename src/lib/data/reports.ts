@@ -15,17 +15,16 @@ export async function getReportData() {
   const completedTasks = tasks?.filter(t => t.completed_at).length ?? 0
 
   const byStage = [
-    { stage: 'Lead', count: clients?.filter(c => c.stage === 'lead').length ?? 0 },
     { stage: 'Consultation', count: clients?.filter(c => c.stage === 'consultation').length ?? 0 },
-    { stage: 'Signed', count: clients?.filter(c => c.stage === 'signed').length ?? 0 },
+    { stage: 'Exit Plan', count: clients?.filter(c => c.stage === 'exit_plan').length ?? 0 },
     { stage: 'In Progress', count: clients?.filter(c => c.stage === 'in_progress').length ?? 0 },
     { stage: 'Resolved', count: clients?.filter(c => c.stage === 'resolved').length ?? 0 },
   ]
 
   const byHealth = [
-    { label: 'Good', count: clients?.filter(c => c.health_status === 'good').length ?? 0, color: '#0D9C8D' },
-    { label: 'At Risk', count: clients?.filter(c => c.health_status === 'at_risk').length ?? 0, color: '#F59E0B' },
-    { label: 'Overdue', count: clients?.filter(c => c.health_status === 'overdue').length ?? 0, color: '#EF4444' },
+    { label: 'On Track', count: clients?.filter(c => c.health_status === 'on_track').length ?? 0, color: 'var(--chart-1)' },
+    { label: 'At Risk', count: clients?.filter(c => c.health_status === 'at_risk').length ?? 0, color: 'var(--chart-4)' },
+    { label: 'Stalled', count: clients?.filter(c => c.health_status === 'stalled').length ?? 0, color: 'var(--chart-3)' },
   ]
 
   const byState: { state: string; count: number }[] = Object.entries(

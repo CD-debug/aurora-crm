@@ -17,6 +17,7 @@ import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/table'
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator } from '@/components/ui/dropdown-menu'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription, SheetFooter } from '@/components/ui/sheet'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog'
 import { NavRail, AuroraArcStepper, ClientHealthBadge, StageBadge } from '@/components/shared'
@@ -161,7 +162,7 @@ function ClientsPageContent() {
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
             <div>
               <h1 className="text-3xl font-heading font-semibold tracking-tight">Clients</h1>
-              <p className="text-muted-foreground mt-1">Your full case directory — click any row to open Client 360</p>
+              <p className="text-muted-foreground mt-1">Your full case directory — click any row to open Client 360.</p>
             </div>
             <Button onClick={() => setAddOpen(true)}>
               <Plus className="w-4 h-4 mr-2" />
@@ -181,44 +182,44 @@ function ClientsPageContent() {
                   className="pl-10"
                 />
               </div>
-              <select
-                value={filters.health}
-                onChange={(e) => setParams({ health: e.target.value || null })}
-                className="px-3 py-2 border rounded-md bg-background text-sm"
-                aria-label="Filter by health"
-              >
-                <option value="">All Health</option>
-                {Object.entries(HEALTH_LABELS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
-              </select>
-              <select
-                value={filters.stage}
-                onChange={(e) => setParams({ stage: e.target.value || null })}
-                className="px-3 py-2 border rounded-md bg-background text-sm"
-                aria-label="Filter by stage"
-              >
-                <option value="">All Stages</option>
-                <option value="active">Active (not resolved)</option>
-                {Object.entries(STAGE_LABELS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
-              </select>
-              <select
-                value={filters.state}
-                onChange={(e) => setParams({ state: e.target.value || null })}
-                className="px-3 py-2 border rounded-md bg-background text-sm"
-                aria-label="Filter by state"
-              >
-                <option value="">All States</option>
-                {allStates.map((s) => <option key={s} value={s}>{s}</option>)}
-              </select>
+              <Select value={filters.health || 'any'} onValueChange={(v) => setParams({ health: v === 'any' ? null : v })}>
+                <SelectTrigger className="w-[160px]" aria-label="Filter by health">
+                  <SelectValue placeholder="All Health" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="any">All Health</SelectItem>
+                  {Object.entries(HEALTH_LABELS).map(([k, v]) => <SelectItem key={k} value={k}>{v}</SelectItem>)}
+                </SelectContent>
+              </Select>
+              <Select value={filters.stage || 'any'} onValueChange={(v) => setParams({ stage: v === 'any' ? null : v })}>
+                <SelectTrigger className="w-[170px]" aria-label="Filter by stage">
+                  <SelectValue placeholder="All Stages" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="any">All Stages</SelectItem>
+                  <SelectItem value="active">Active (not resolved)</SelectItem>
+                  {Object.entries(STAGE_LABELS).map(([k, v]) => <SelectItem key={k} value={k}>{v}</SelectItem>)}
+                </SelectContent>
+              </Select>
+              <Select value={filters.state || 'any'} onValueChange={(v) => setParams({ state: v === 'any' ? null : v })}>
+                <SelectTrigger className="w-[140px]" aria-label="Filter by state">
+                  <SelectValue placeholder="All States" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="any">All States</SelectItem>
+                  {allStates.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+                </SelectContent>
+              </Select>
               {allTags.length > 0 && (
-                <select
-                  value={filters.tag}
-                  onChange={(e) => setParams({ tag: e.target.value || null })}
-                  className="px-3 py-2 border rounded-md bg-background text-sm"
-                  aria-label="Filter by tag"
-                >
-                  <option value="">All Tags</option>
-                  {allTags.map((t) => <option key={t} value={t}>{t}</option>)}
-                </select>
+                <Select value={filters.tag || 'any'} onValueChange={(v) => setParams({ tag: v === 'any' ? null : v })}>
+                  <SelectTrigger className="w-[140px]" aria-label="Filter by tag">
+                    <SelectValue placeholder="All Tags" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="any">All Tags</SelectItem>
+                    {allTags.map((t) => <SelectItem key={t} value={t}>{t}</SelectItem>)}
+                  </SelectContent>
+                </Select>
               )}
               {hasFilters && (
                 <Button variant="ghost" size="sm" onClick={() => router.replace('/clients')}>

@@ -56,23 +56,25 @@ export function AuroraArcStepper({
           const isPast = i < currentIndex
           const isCurrent = i === currentIndex
           const isFuture = i > currentIndex
-          const canClick = onStageClick && (isFuture || isCurrent === false && isPast === false)
+          // Allow click to advance (isFuture) or undo (isPast). Current stage is the anchor — click it to no-op.
+          const interactive = onStageClick && (isFuture || isPast)
           return (
             <button
               key={stage}
               type="button"
-              onClick={() => isFuture && onStageClick?.(stage)}
-              disabled={!onStageClick || isCurrent || isPast}
+              onClick={() => interactive && onStageClick(stage)}
+              disabled={!interactive}
               className={cn(
                 'group flex flex-col items-center gap-1.5 outline-none focus-visible:ring-2 focus-visible:ring-ring/50 rounded-md px-1',
-                onStageClick && isFuture ? 'cursor-pointer' : 'cursor-default'
+                interactive ? 'cursor-pointer' : 'cursor-default'
               )}
               aria-current={isCurrent ? 'step' : undefined}
+              title={isPast ? `Revert to ${STAGE_LABELS[stage]}` : isFuture ? `Advance to ${STAGE_LABELS[stage]}` : undefined}
             >
               <span
                 className={cn(
                   'flex items-center justify-center w-5 h-5 rounded-full border-2 bg-background transition-colors',
-                  isPast && 'border-[var(--arc-end)] bg-[var(--arc-end)] text-primary-foreground opacity-60',
+                  isPast && 'border-[var(--arc-end)] bg-[var(--arc-end)] text-primary-foreground opacity-60 group-hover:opacity-100',
                   isCurrent && 'border-[var(--arc-start)] bg-[var(--arc-start)]',
                   isFuture && 'border-border group-hover:border-[var(--arc-start)]'
                 )}
