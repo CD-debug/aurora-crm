@@ -52,7 +52,7 @@ function TasksPageContent() {
   }
 
   const [selectedId, setSelectedId] = useState<string | null>(null)
-  const [showCalendar, setShowCalendar] = useState(false)
+  const [showCalendar, setShowCalendar] = useState(true)
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setSelectedId(null) }
     window.addEventListener('keydown', onKey)
@@ -184,7 +184,7 @@ function TasksPageContent() {
             </Button>
           </div>
 
-          {/* Calendar — collapsed by default */}
+          {/* Calendar — visible by default (PRD §12.1) */}
           {showCalendar && (
             <div className="mb-6 p-4 rounded-lg border bg-card">
               <Calendar
@@ -202,7 +202,7 @@ function TasksPageContent() {
           )}
 
           {/* Filter bar */}
-          <div className="mb-4 p-4 rounded-lg border bg-card">
+          <div className="sticky top-0 z-10 mb-4 p-4 rounded-lg border bg-card">
             <div className="flex flex-wrap items-center gap-3">
               <div className="flex rounded-md border overflow-hidden text-sm">
                 <button
@@ -293,13 +293,13 @@ function TasksPageContent() {
             <div className="rounded-lg border bg-card p-10 text-center">
               {hasFilters ? (
                 <>
-                  <p className="text-muted-foreground mb-4">No tasks match these filters.</p>
+                  <p className="text-muted-foreground mb-4">No tasks match these filters. Try widening your view.</p>
                   <Button variant="outline" onClick={() => router.replace('/tasks')}>Clear filters</Button>
                 </>
               ) : (
                 <>
                   <p className="text-muted-foreground mb-4">
-                    {view === 'focus' ? 'Nothing due today.' : 'No tasks yet.'}
+                    {view === 'focus' ? 'Nothing due today. Add a task to keep these cases moving.' : 'No tasks yet. Start by adding one from any Client 360 page.'}
                   </p>
                   {view === 'focus' && (
                     <Button variant="outline" onClick={() => setParams({ view: 'all' })}>View all tasks</Button>

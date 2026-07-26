@@ -29,7 +29,7 @@ import type { ClientWithHealth } from '@/lib/data/types'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
 
-const SORTABLE = ['name', 'state', 'health_status', 'stage', 'last_contact_at'] as const
+const SORTABLE = ['name', 'state', 'zip', 'email', 'health_status', 'stage', 'last_contact_at'] as const
 type SortKey = (typeof SORTABLE)[number]
 
 const EMPTY_FORM = { name: '', phone: '', email: '', state: '', zip: '', tags: '' }
@@ -265,8 +265,8 @@ function ClientsPageContent() {
                     <SortHead label="Name" k="name" />
                     <TableHead>Phone</TableHead>
                     <SortHead label="State" k="state" />
-                    <TableHead>ZIP</TableHead>
-                    <TableHead>Email</TableHead>
+                    <SortHead label="ZIP" k="zip" />
+                    <SortHead label="Email" k="email" />
                     <SortHead label="Health" k="health_status" />
                     <SortHead label="Stage" k="stage" />
                     <SortHead label="Last Contact" k="last_contact_at" />

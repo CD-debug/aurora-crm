@@ -56,7 +56,7 @@ src/
 
 **Reads** go through `lib/data/client-queries.ts` (browser) or `lib/data/queries.ts` (server). Both query the `clients_with_health` view, which computes health status, last contact, and task counts on the fly — never stored.
 
-**Auth** is gated by `src/middleware.ts` — unauthenticated users are redirected to `/login`. Row-level security in Supabase enforces that each user only sees their own data.
+**Auth** is gated by `src/proxy.ts` — unauthenticated users are redirected to `/login`. Row-level security in Supabase enforces that each user only sees their own data.
 
 ## Scripts
 
