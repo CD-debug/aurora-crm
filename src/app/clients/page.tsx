@@ -244,7 +244,7 @@ function ClientsPageContent() {
             <div className="rounded-lg border bg-card p-10 text-center">
               {hasFilters ? (
                 <>
-                  <p className="text-muted-foreground mb-4">No clients match these filters.</p>
+                  <p className="text-muted-foreground mb-4">No clients match these filters. Try widening your search.</p>
                   <Button variant="outline" onClick={() => router.replace('/clients')}>Clear filters</Button>
                 </>
               ) : (
