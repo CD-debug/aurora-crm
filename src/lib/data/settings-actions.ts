@@ -9,26 +9,55 @@ import type { PipelineStage } from './types'
 
 const VALID_STAGES: PipelineStage[] = ['consultation', 'exit_plan', 'in_progress', 'resolved']
 
+// Default values used when the settings table hasn't been created yet
+// (graceful degradation — the page still renders, just with no persisted state).
+const SETTINGS_DEFAULTS: Record<string, Record<string, unknown>> = {
+  general: { company_name: 'Aurora CRM' },
+  lead_ingestion: { enabled: false, api_key: null, webhook_url: null },
+  csv_import: { last_import_at: null, total_imported: 0, duplicates_skipped: 0 },
+}
+
+function isMissingTable(err: { code?: string; message?: string } | null | undefined): boolean {
+  if (!err) return false
+  const code = err.code ?? ''
+  const msg = (err.message ?? '').toLowerCase()
+  return (
+    code === 'PGRST205' ||
+    code === '42883' || // function not found
+    msg.includes('relation') && msg.includes('does not exist') ||
+    msg.includes('function') && msg.includes('does not exist')
+  )
+}
+
 export async function getSettings(key: string) {
   const supabase = await createServerClient()
   const { data, error } = await supabase.rpc('get_settings', { p_key: key })
-  if (error) throw error
-  return data as Record<string, unknown>
+  if (error) {
+    if (isMissingTable(error)) return SETTINGS_DEFAULTS[key] ?? {}
+    throw error
+  }
+  return (data as Record<string, unknown> | null) ?? SETTINGS_DEFAULTS[key] ?? {}
 }
 
 export async function updateSettings(key: string, value: Record<string, unknown>) {
   const supabase = await createServerClient()
   const { error } = await supabase.rpc('update_settings', { p_key: key, p_value: value })
-  if (error) throw error
+  if (error) {
+    if (isMissingTable(error)) return // graceful no-op until table is created
+    throw error
+  }
   revalidatePath('/settings')
 }
 
 export async function regenerateApiKey() {
   const supabase = await createServerClient()
   const { data, error } = await supabase.rpc('regenerate_api_key')
-  if (error) throw error
+  if (error) {
+    if (isMissingTable(error)) return null
+    throw error
+  }
   revalidatePath('/settings')
-  return data as string
+  return data as string | null
 }
 
 export async function exportClientsCsv() {

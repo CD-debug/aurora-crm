@@ -44,6 +44,10 @@ export function LeadIngestion() {
     setLoading(true)
     try {
       const newKey = await regenerateApiKey()
+      if (!newKey) {
+        toast.error('Run supabase/settings-table.sql to enable this — settings table missing.')
+        return
+      }
       setApiKey(newKey)
       toast.success('API key regenerated')
     } catch {
@@ -82,6 +86,12 @@ export function LeadIngestion() {
       <p className="text-sm text-muted-foreground mb-6">
         Accept incoming leads via API webhook. Enable to receive leads from external sources.
       </p>
+
+      {!apiKey && (
+        <div className="mb-4 rounded-md bg-amber-50 border border-amber-200 px-3 py-2 text-sm text-amber-900">
+          Settings table not yet created. Paste <code className="font-mono text-xs">supabase/settings-table.sql</code> into the SQL Editor to enable key persistence.
+        </div>
+      )}
 
       <div className="space-y-4">
         {/* Enable toggle */}
