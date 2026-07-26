@@ -1,9 +1,9 @@
 import { createServerClient, type CookieOptions } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
 
-// Middleware: refresh the Supabase session and gate the app behind auth.
-// Data authorization lives in RLS + server actions, not here.
-export async function middleware(request: NextRequest) {
+// Next.js 16 proxy (formerly middleware): refresh the Supabase session and
+// gate the app behind auth. Data authorization lives in RLS + server actions.
+export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl
 
   const pendingCookies: { name: string; value: string; options?: CookieOptions }[] = []
@@ -28,20 +28,28 @@ export async function middleware(request: NextRequest) {
     data: { user },
   } = await supabase.auth.getUser()
 
-  const isPublicPath = pathname.startsWith('/login')
+  const isPublicPath =
+    pathname.startsWith('/login') ||
+    pathname === '/auth/callback' ||
+    pathname === '/api/leads' ||
+    pathname.startsWith('/lead')
 
   if (!user && !isPublicPath) {
     const url = request.nextUrl.clone()
     url.pathname = '/login'
     if (pathname !== '/') url.searchParams.set('redirectTo', pathname + request.nextUrl.search)
-    return NextResponse.redirect(url)
+    const redirectResponse = NextResponse.redirect(url)
+    pendingCookies.forEach(({ name, value, options }) => redirectResponse.cookies.set(name, value, options))
+    return redirectResponse
   }
 
   if (user && pathname === '/login') {
     const url = request.nextUrl.clone()
     url.pathname = '/'
     url.search = ''
-    return NextResponse.redirect(url)
+    const redirectResponse = NextResponse.redirect(url)
+    pendingCookies.forEach(({ name, value, options }) => redirectResponse.cookies.set(name, value, options))
+    return redirectResponse
   }
 
   const response = NextResponse.next({ request: { headers: request.headers } })

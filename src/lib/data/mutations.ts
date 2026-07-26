@@ -10,9 +10,10 @@ import { revalidatePath } from 'next/cache'
 import { z } from 'zod'
 import { createServerClient } from '@/lib/supabase/server'
 import { findDuplicates } from './domain'
-import type { Client, Note, NoteChannel, PipelineStage, Property, Task } from './types'
+import { clientInput } from './schemas'
+import type { Client, Note, PipelineStage, Property, Task } from './types'
 
-async function requireUser() {
+export async function requireUser() {
   const supabase = await createServerClient()
   const {
     data: { user },
@@ -35,15 +36,6 @@ function fail(error: { message: string }): never {
 // ---------------------------------------------------------------------------
 // Clients
 // ---------------------------------------------------------------------------
-
-const clientInput = z.object({
-  name: z.string().trim().min(1, 'Name is required').max(255),
-  phone: z.string().trim().min(1, 'Phone is required').max(40),
-  email: z.string().trim().email('Enter a valid email').max(255),
-  state: z.string().trim().length(2, 'Use the 2-letter state code').toUpperCase(),
-  zip: z.string().trim().min(3, 'Enter a ZIP code').max(10),
-  tags: z.array(z.string().trim().min(1).max(40)).max(12).optional(),
-})
 
 export type CreateClientResult =
   | { status: 'created'; client: Client }
@@ -119,7 +111,16 @@ const propertyInput = z.object({
   loan_balance: money,
   maintenance_fee: money,
   fee_due_date: z.iso.date().nullable().optional(),
-  document_reference: z.string().trim().max(500).nullable().optional(),
+  document_reference: z
+    .string()
+    .trim()
+    .max(500)
+    .nullable()
+    .optional()
+    .refine(
+      (v) => !v || v.startsWith('http://') || v.startsWith('https://'),
+      { message: 'Document reference must be a valid URL starting with http:// or https://' }
+    ),
 })
 
 export async function createProperty(input: z.input<typeof propertyInput>) {
@@ -162,7 +163,10 @@ export async function setPropertyPaidOff(
       .eq('id', propertyId)
       .single()
     if (error) fail(error)
-    eliminated = prop?.loan_balance != null ? Number(prop.loan_balance) : null
+    if (prop?.loan_balance == null) {
+      throw new Error('Add a loan balance before marking this property paid off.')
+    }
+    eliminated = Number(prop.loan_balance)
   }
 
   const { error } = await supabase
@@ -275,5 +279,3 @@ export async function deleteTask(taskId: string, clientId: string) {
   if (error) fail(error)
   revalidate(clientId)
 }
-
-export type { NoteChannel }

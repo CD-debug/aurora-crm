@@ -11,6 +11,8 @@ import { useParams, useRouter } from 'next/navigation'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { format } from 'date-fns'
 import { toast } from 'sonner'
+import { motion } from 'framer-motion'
+import { ActivityTimeline } from '@/components/shared/ActivityTimeline'
 import {
   Calendar, Clock, DollarSign, Home, AlertTriangle, CheckCircle, Plus, Trash2,
   Mail, Phone, MessageSquare, FileText, Building2, Target, TrendingUp, Pencil,
@@ -22,6 +24,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { Badge } from '@/components/ui/badge'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription, SheetFooter } from '@/components/ui/sheet'
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog'
 import { NavRail, Breadcrumb, AuroraArcStepper, ClientHealthBadge, StageBadge, TaskStatusBadge } from '@/components/shared'
 import { createClient } from '@/lib/supabase/client'
 import { fetchClient360, invalidateAfterMutation } from '@/lib/data/client-queries'
@@ -162,7 +165,9 @@ export default function Client360Page() {
         toast.success('Property added')
       }
       await invalidateAfterMutation(queryClient, clientId)
+      await queryClient.refetchQueries({ queryKey: queryKeys.clients.detail(clientId) })
       setPropertySheetOpen(false)
+      setPropertyForm(EMPTY_PROPERTY_FORM)
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Couldn't save this property. Check the details and try again.")
     } finally {
@@ -248,6 +253,32 @@ export default function Client360Page() {
     }
   }
 
+  // --- Unified destructive confirm (replaces window.confirm) ------------------
+  const [deleteTarget, setDeleteTarget] = useState<
+    | { kind: 'note'; id: string; label: string }
+    | { kind: 'task'; id: string; label: string }
+    | { kind: 'property'; id: string; label: string }
+    | null
+  >(null)
+  const [deleting, setDeleting] = useState(false)
+
+  const confirmDelete = async () => {
+    if (!deleteTarget) return
+    setDeleting(true)
+    try {
+      if (deleteTarget.kind === 'note') {
+        await handleDeleteNote(deleteTarget.id)
+      } else if (deleteTarget.kind === 'task') {
+        await handleDeleteTask(deleteTarget.id)
+      } else if (deleteTarget.kind === 'property') {
+        await handleDeleteProperty({ id: deleteTarget.id } as Property)
+      }
+      setDeleteTarget(null)
+    } finally {
+      setDeleting(false)
+    }
+  }
+
   // --- Edit client -------------------------------------------------------------
   const [editOpen, setEditOpen] = useState(false)
   const [editForm, setEditForm] = useState({ name: '', phone: '', email: '', state: '', zip: '', tags: '' })
@@ -317,7 +348,6 @@ export default function Client360Page() {
 
   const { client, properties, notes, tasks } = data
   const fin = financialProgress(properties)
-  const percentComplete = stagePercent(client.stage)
   const openTasks = tasks.filter((t) => !t.completed_at)
   const overdueTasks = openTasks.filter((t) => taskStatus(t) === 'overdue')
   const docsMissing = properties.filter((p) => !p.document_reference).length
@@ -384,32 +414,38 @@ export default function Client360Page() {
               {/* §11.1 Case statistics — all computed */}
               <section id="statistics" className="rounded-xl border bg-card p-6 scroll-mt-24">
                 <h2 className="text-lg font-semibold mb-4">Case Statistics</h2>
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                  <StatCard label="Days in Stage" value={daysSince(client.stage_entered_at)} icon={<Clock className="w-4 h-4" />} />
-                  <StatCard label="Total Days in Process" value={daysSince(client.case_opened_at)} icon={<Calendar className="w-4 h-4" />} />
-                  <StatCard label="Case Opened" value={format(new Date(client.case_opened_at), 'MMM d, yyyy')} icon={<FileText className="w-4 h-4" />} small />
-                  <StatCard
+                <motion.div
+                  initial="hidden"
+                  animate="visible"
+                  variants={{ visible: { transition: { staggerChildren: 0.05 } } }}
+                  className="grid grid-cols-2 md:grid-cols-4 gap-4"
+                >
+                  <motion.div variants={{ hidden: { opacity: 0, y: 12 }, visible: { opacity: 1, y: 0 } }}><StatCard label="Days in Stage" value={daysSince(client.stage_entered_at)} icon={<Clock className="w-4 h-4" />} /></motion.div>
+                  <motion.div variants={{ hidden: { opacity: 0, y: 12 }, visible: { opacity: 1, y: 0 } }}><StatCard label="Total Days in Process" value={daysSince(client.case_opened_at)} icon={<Calendar className="w-4 h-4" />} /></motion.div>
+                  <motion.div variants={{ hidden: { opacity: 0, y: 12 }, visible: { opacity: 1, y: 0 } }}><StatCard label="Case Opened" value={format(new Date(client.case_opened_at), 'MMM d, yyyy')} icon={<FileText className="w-4 h-4" />} small /></motion.div>
+                  <motion.div variants={{ hidden: { opacity: 0, y: 12 }, visible: { opacity: 1, y: 0 } }}><StatCard
                     label="Last Contact"
                     value={client.last_contact_at ? format(new Date(client.last_contact_at), 'MMM d, yyyy') : 'Never'}
                     icon={<MessageSquare className="w-4 h-4" />}
                     small
-                  />
-                  <StatCard
+                  /></motion.div>
+                  <motion.div variants={{ hidden: { opacity: 0, y: 12 }, visible: { opacity: 1, y: 0 } }}><StatCard
                     label="Next Scheduled Action"
                     value={client.next_task_due ? format(new Date(client.next_task_due + 'T00:00:00'), 'MMM d, yyyy') : 'None scheduled'}
                     icon={<CalendarClock className="w-4 h-4" />}
                     small
                     warn={!client.next_task_due && client.stage !== 'resolved'}
-                  />
-                  <StatCard label="Open Tasks" value={openTasks.length} icon={<Target className="w-4 h-4" />} />
-                  <StatCard label="Overdue Tasks" value={overdueTasks.length} icon={<AlertTriangle className="w-4 h-4" />} warn={overdueTasks.length > 0} />
-                  <StatCard
+                  /></motion.div>
+                  <motion.div variants={{ hidden: { opacity: 0, y: 12 }, visible: { opacity: 1, y: 0 } }}><StatCard label="Percent Complete" value={`${stagePercent(client.stage)}%`} icon={<Percent className="w-4 h-4" />} /></motion.div>
+                  <motion.div variants={{ hidden: { opacity: 0, y: 12 }, visible: { opacity: 1, y: 0 } }}><StatCard label="Open Tasks" value={openTasks.length} icon={<Target className="w-4 h-4" />} /></motion.div>
+                  <motion.div variants={{ hidden: { opacity: 0, y: 12 }, visible: { opacity: 1, y: 0 } }}><StatCard label="Overdue Tasks" value={overdueTasks.length} icon={<AlertTriangle className="w-4 h-4" />} warn={overdueTasks.length > 0} /></motion.div>
+                  <motion.div variants={{ hidden: { opacity: 0, y: 12 }, visible: { opacity: 1, y: 0 } }}><StatCard
                     label="Next Maintenance Fee"
                     value={nextFeeDue ? format(new Date(nextFeeDue + 'T00:00:00'), 'MMM d, yyyy') : '—'}
                     icon={<Home className="w-4 h-4" />}
                     small
-                  />
-                </div>
+                  /></motion.div>
+                </motion.div>
 
                 {/* Amount owed vs. eliminated (PRD §11.1) */}
                 <div className="mt-6">
@@ -423,24 +459,22 @@ export default function Client360Page() {
                     </span>
                   </div>
                   <div className="h-2.5 rounded-full bg-border overflow-hidden">
-                    <div
-                      className="h-full bg-aurora-arc rounded-full transition-all duration-500"
-                      style={{ width: `${fin.percent}%` }}
+                    <motion.div
+                      initial={{ width: 0 }}
+                      animate={{ width: `${fin.percent}%` }}
+                      transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1], delay: 0.3 }}
+                      className="h-full bg-aurora-arc rounded-full"
                     />
                   </div>
                   <div className="flex justify-between text-xs text-muted-foreground mt-1 font-mono tabular-nums">
                     <span>{fin.percent}% eliminated</span>
-                    <span className="flex items-center gap-1">
-                      <Percent className="w-3 h-3" />
-                      {percentComplete}% to resolution
-                    </span>
                   </div>
                 </div>
 
                 <div className="mt-4 flex flex-wrap gap-x-6 gap-y-1 text-sm text-muted-foreground">
                   <span className="flex items-center gap-1.5">
                     <FileWarning className="w-4 h-4" />
-                    Documents: {properties.length === 0
+                    Document URLs: {properties.length === 0
                       ? 'no properties on file'
                       : docsMissing === 0
                         ? `on file for all ${properties.length} ${properties.length === 1 ? 'property' : 'properties'}`
@@ -454,7 +488,12 @@ export default function Client360Page() {
               </section>
 
               {/* §11.2 Property records */}
-              <section id="properties" className="rounded-xl border bg-card scroll-mt-24">
+              <motion.section
+                initial={{ opacity: 0, y: 16 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1], delay: 0.2 }}
+                id="properties" className="rounded-xl border bg-card scroll-mt-24"
+              >
                 <div className="p-4 border-b flex items-center justify-between">
                   <h2 className="text-lg font-semibold flex items-center gap-2">
                     <Building2 className="w-5 h-5" />
@@ -482,15 +521,20 @@ export default function Client360Page() {
                         onEdit={() => openEditProperty(p)}
                         onStartPayoff={() => { setPayoffProperty(p); setPayoffValue(p.loan_balance != null ? String(p.loan_balance) : '') }}
                         onReactivate={() => handleReactivate(p)}
-                        onDelete={() => handleDeleteProperty(p)}
+                        onDelete={() => setDeleteTarget({ kind: 'property', id: p.id, label: p.resort_name })}
                       />
                     ))
                   )}
                 </div>
-              </section>
+              </motion.section>
 
               {/* §11.3 Notes — inline quick-add, newest first */}
-              <section id="notes" className="rounded-xl border bg-card scroll-mt-24">
+              <motion.section
+                initial={{ opacity: 0, y: 16 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1], delay: 0.3 }}
+                id="notes" className="rounded-xl border bg-card scroll-mt-24"
+              >
                 <div className="p-4 border-b">
                   <h2 className="text-lg font-semibold flex items-center gap-2">
                     <FileText className="w-5 h-5" />
@@ -543,7 +587,7 @@ export default function Client360Page() {
                                   {format(new Date(note.created_at), 'MMM d, yyyy h:mm a')}
                                 </span>
                                 <button
-                                  onClick={() => handleDeleteNote(note.id)}
+                                  onClick={() => setDeleteTarget({ kind: 'note', id: note.id, label: note.content.slice(0, 60) })}
                                   className="ml-auto opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-red-600 transition-all"
                                   aria-label="Delete note"
                                   title="Delete note"
@@ -559,11 +603,31 @@ export default function Client360Page() {
                     })
                   )}
                 </div>
-              </section>
+              </motion.section>
+
+              {/* Activity Timeline */}
+              <motion.section
+                initial={{ opacity: 0, y: 12 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1], delay: 0.3 }}
+                className="mt-6 rounded-xl border bg-card p-4"
+              >
+                <h2 className="text-lg font-semibold mb-4">Activity Timeline</h2>
+                <ActivityTimeline items={[
+                  ...notes.map(n => ({ id: n.id, type: 'note' as const, title: 'Note', description: n.content, date: n.created_at })),
+                  ...tasks.map(t => ({ id: t.id, type: 'task' as const, title: t.title, description: t.completed_at ? 'Completed' : t.due_date ? `Due ${new Date(t.due_date).toLocaleDateString()}` : undefined, date: t.created_at })),
+                  ...properties.map(p => ({ id: p.id, type: 'property' as const, title: `Property: ${p.resort_name}`, description: p.status === 'paid_off' ? 'Paid off' : undefined, date: p.created_at })),
+                ]} />
+              </motion.section>
             </div>
 
             {/* §11.4 Tasks & Appointments — persistent right column */}
-            <div className="min-w-0">
+            <motion.div
+              initial={{ opacity: 0, x: 16 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1], delay: 0.25 }}
+              className="min-w-0"
+            >
               <section id="tasks" className="rounded-xl border bg-card lg:sticky lg:top-24 scroll-mt-24">
                 <div className="p-4 border-b flex items-center justify-between">
                   <h2 className="text-lg font-semibold flex items-center gap-2">
@@ -616,7 +680,7 @@ export default function Client360Page() {
                               aria-label={status === 'completed' ? 'Reopen task' : 'Complete task'}
                             >
                               {status === 'completed'
-                                ? <CheckCircle className="w-4.5 h-4.5 w-5 h-5 text-green-600" />
+                                ? <CheckCircle className="w-5 h-5 text-green-600" />
                                 : <span className="block w-4 h-4 rounded border border-muted-foreground/50 hover:border-primary transition-colors" />}
                             </button>
                             <div className="flex-1 min-w-0">
@@ -630,7 +694,7 @@ export default function Client360Page() {
                                   {format(new Date(task.due_date + 'T00:00:00'), 'MMM d, yyyy')}
                                 </span>
                                 <button
-                                  onClick={() => handleDeleteTask(task.id)}
+                                  onClick={() => setDeleteTarget({ kind: 'task', id: task.id, label: task.title })}
                                   className="ml-auto opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-red-600 transition-all"
                                   aria-label="Delete task"
                                   title="Delete task"
@@ -646,7 +710,7 @@ export default function Client360Page() {
                   )}
                 </div>
               </section>
-            </div>
+            </motion.div>
           </div>
         </div>
 
@@ -659,11 +723,11 @@ export default function Client360Page() {
             </SheetHeader>
             <form onSubmit={submitProperty} className="space-y-4 p-4">
               <div className="space-y-2">
-                <label className="text-sm font-medium">Resort Name *</label>
+                <label className="text-sm font-medium">Property / Resort Name *</label>
                 <Input value={propertyForm.resort_name} onChange={(e) => setPropertyForm({ ...propertyForm, resort_name: e.target.value })} required />
               </div>
               <div className="space-y-2">
-                <label className="text-sm font-medium">Resort Location *</label>
+                <label className="text-sm font-medium">Location (City, State) *</label>
                 <Input value={propertyForm.resort_location} onChange={(e) => setPropertyForm({ ...propertyForm, resort_location: e.target.value })} required />
               </div>
               <div className="space-y-2">
@@ -672,26 +736,26 @@ export default function Client360Page() {
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <label className="text-sm font-medium">Purchase Price</label>
+                  <label className="text-sm font-medium">Original Purchase Price ($)</label>
                   <Input type="number" step="0.01" min="0" value={propertyForm.purchase_price} onChange={(e) => setPropertyForm({ ...propertyForm, purchase_price: e.target.value })} />
                 </div>
                 <div className="space-y-2">
-                  <label className="text-sm font-medium">Amount Owed (Loan Balance)</label>
+                  <label className="text-sm font-medium">Current Loan Balance ($)</label>
                   <Input type="number" step="0.01" min="0" value={propertyForm.loan_balance} onChange={(e) => setPropertyForm({ ...propertyForm, loan_balance: e.target.value })} />
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <label className="text-sm font-medium">Maintenance Fee</label>
+                  <label className="text-sm font-medium">Annual Maintenance Fee ($)</label>
                   <Input type="number" step="0.01" min="0" value={propertyForm.maintenance_fee} onChange={(e) => setPropertyForm({ ...propertyForm, maintenance_fee: e.target.value })} />
                 </div>
                 <div className="space-y-2">
-                  <label className="text-sm font-medium">Fee Due Date</label>
+                  <label className="text-sm font-medium">Next Fee Due Date</label>
                   <Input type="date" value={propertyForm.fee_due_date} onChange={(e) => setPropertyForm({ ...propertyForm, fee_due_date: e.target.value })} />
                 </div>
               </div>
               <div className="space-y-2">
-                <label className="text-sm font-medium">Document / Contract Reference (link)</label>
+                <label className="text-sm font-medium">Document URL</label>
                 <Input value={propertyForm.document_reference} onChange={(e) => setPropertyForm({ ...propertyForm, document_reference: e.target.value })} placeholder="https://…" />
               </div>
               <SheetFooter>
@@ -767,6 +831,31 @@ export default function Client360Page() {
             </form>
           </SheetContent>
         </Sheet>
+
+        {/* Destructive confirm — replaces window.confirm */}
+        <Dialog open={!!deleteTarget} onOpenChange={(open) => !open && !deleting && setDeleteTarget(null)}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>
+                Delete {deleteTarget?.kind === 'property' ? 'this property' : deleteTarget?.kind === 'task' ? 'this task' : 'this note'}?
+              </DialogTitle>
+              <DialogDescription>
+                {deleteTarget?.kind === 'property' &&
+                  `${deleteTarget.label} will be permanently removed along with its financial history. This can’t be undone.`}
+                {deleteTarget?.kind === 'task' &&
+                  `"${deleteTarget.label}" will be permanently removed. This can’t be undone.`}
+                {deleteTarget?.kind === 'note' &&
+                  `This note will be permanently removed. This can’t be undone.`}
+              </DialogDescription>
+            </DialogHeader>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setDeleteTarget(null)} disabled={deleting}>Cancel</Button>
+              <Button variant="destructive" onClick={confirmDelete} disabled={deleting}>
+                {deleting ? 'Deleting…' : 'Delete'}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </main>
     </div>
   )
@@ -782,7 +871,7 @@ function StatCard({
   warn?: boolean
 }) {
   return (
-    <div className={cn('p-4 rounded-lg border', warn ? 'border-amber-300 bg-amber-50' : 'bg-muted/30')}>
+    <div className={cn('p-4 rounded-lg border transition-all hover:shadow-sm', warn ? 'border-amber-300 bg-amber-50' : 'bg-muted/30 hover:bg-muted/50')}>
       <div className={cn('flex items-center gap-2 text-sm mb-1', warn ? 'text-amber-800' : 'text-muted-foreground')}>
         {icon}
         <span>{label}</span>
@@ -803,7 +892,7 @@ function PropertyCard({
 }) {
   const isPaid = p.status === 'paid_off'
   return (
-    <div className={cn('p-4 hover:bg-muted/30 transition-colors group', isPaid && 'bg-green-50/40')}>
+    <div className={cn('p-4 hover:bg-muted/30 transition-all hover:shadow-sm group', isPaid && 'bg-green-50/40')}>
       <div className="flex items-start justify-between gap-4">
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 flex-wrap mb-1">
@@ -814,7 +903,7 @@ function PropertyCard({
               {isPaid ? 'Paid Off' : p.status.replace('_', ' ')}
             </Badge>
             {!p.document_reference ? (
-              <Badge variant="outline" className="bg-amber-100 text-amber-800 border-amber-200">Doc missing</Badge>
+              <Badge variant="outline" className="bg-amber-100 text-amber-800 border-amber-200">No document URL</Badge>
             ) : (
               <a href={p.document_reference} target="_blank" rel="noreferrer" className="text-xs text-primary hover:underline flex items-center gap-1">
                 <FileText className="w-3 h-3" /> Contract
@@ -825,7 +914,8 @@ function PropertyCard({
             {p.resort_location}{p.unit_number ? ` · Unit ${p.unit_number}` : ''}
           </p>
           <div className="flex flex-wrap gap-x-4 gap-y-1 mt-2 text-sm text-muted-foreground font-mono tabular-nums">
-            {p.loan_balance != null && <span>Owed: ${Number(p.loan_balance).toLocaleString()}</span>}
+            {p.purchase_price != null && <span>Purchase: ${Number(p.purchase_price).toLocaleString()}</span>}
+            {!isPaid && p.loan_balance != null && <span>Owed: ${Number(p.loan_balance).toLocaleString()}</span>}
             {isPaid && p.value_eliminated != null && (
               <span className="text-green-700">Eliminated: ${Number(p.value_eliminated).toLocaleString()}</span>
             )}
