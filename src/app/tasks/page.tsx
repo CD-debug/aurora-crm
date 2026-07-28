@@ -335,109 +335,107 @@ function TasksPageContent() {
                     const dueToday = isSameDay(parseISO(task.due_date), today)
 
                     return (
-                      <tr key={task.id} className={cn(completed && 'opacity-50')}>
-                        <td className="px-4 py-2.5 align-middle">
-                          <button
-                            onClick={(e) => { e.stopPropagation(); toggleComplete(task) }}
-                            aria-label={completed ? 'Reopen task' : 'Complete task'}
+                      <>
+                        <tr key={task.id} className={cn(completed && 'opacity-50')}>
+                          <td className="px-4 py-2.5 align-middle">
+                            <button
+                              onClick={(e) => { e.stopPropagation(); toggleComplete(task) }}
+                              aria-label={completed ? 'Reopen task' : 'Complete task'}
+                            >
+                              {completed
+                                ? <CheckCircle className="w-4 h-4 text-green-600" />
+                                : <span className="block w-4 h-4 rounded border-[1.5px] border-muted-foreground/40 hover:border-primary transition-colors" />}
+                            </button>
+                          </td>
+                          <td
+                            className={cn(
+                              'px-4 py-2.5 cursor-pointer hover:bg-muted/40 transition-colors',
+                              expanded && 'bg-muted/40'
+                            )}
+                            onClick={() => setSelectedId(expanded ? null : task.id)}
                           >
-                            {completed
-                              ? <CheckCircle className="w-4 h-4 text-green-600" />
-                              : <span className="block w-4 h-4 rounded border-[1.5px] border-muted-foreground/40 hover:border-primary transition-colors" />}
-                          </button>
-                        </td>
-                        <td
-                          className={cn(
-                            'px-4 py-2.5 cursor-pointer hover:bg-muted/40 transition-colors',
-                            expanded && 'bg-muted/40'
-                          )}
-                          onClick={() => setSelectedId(expanded ? null : task.id)}
-                        >
-                          <span className={cn('font-medium block truncate', completed && 'line-through text-muted-foreground')}>
-                            {task.title}
-                          </span>
-                        </td>
-                        <td className="px-4 py-2.5 hidden sm:table-cell">
-                          <button
-                            onClick={(e) => { e.stopPropagation(); router.push(`/clients/${task.client_id}#tasks`) }}
-                            className="text-muted-foreground hover:text-primary hover:underline text-xs"
-                          >
-                            {task.clients?.name ?? '—'}
-                          </button>
-                        </td>
-                        <td className="px-4 py-2.5 text-right">
-                          <span className={cn(
-                            'text-xs font-mono tabular-nums',
-                            overdue && 'text-red-600 font-semibold',
-                            dueToday && !completed && 'text-amber-600 font-medium',
-                            completed && 'text-muted-foreground'
-                          )}>
-                            {formatDue(task.due_date)}
-                          </span>
-                        </td>
-                        <td className="px-2 py-2.5 text-right">
-                          <button
-                            onClick={(e) => { e.stopPropagation(); setSelectedId(expanded ? null : task.id) }}
-                            className="p-1 hover:bg-muted rounded transition-colors"
-                          >
-                            {expanded
-                              ? <ChevronDown className="w-4 h-4 text-muted-foreground" />
-                              : <ChevronRight className="w-4 h-4 text-muted-foreground" />}
-                          </button>
-                        </td>
-                      </tr>
+                            <span className={cn('font-medium block truncate', completed && 'line-through text-muted-foreground')}>
+                              {task.title}
+                            </span>
+                          </td>
+                          <td className="px-4 py-2.5 hidden sm:table-cell">
+                            <button
+                              onClick={(e) => { e.stopPropagation(); router.push(`/clients/${task.client_id}#tasks`) }}
+                              className="text-muted-foreground hover:text-primary hover:underline text-xs"
+                            >
+                              {task.clients?.name ?? '—'}
+                            </button>
+                          </td>
+                          <td className="px-4 py-2.5 text-right">
+                            <span className={cn(
+                              'text-xs font-mono tabular-nums',
+                              overdue && 'text-red-600 font-semibold',
+                              dueToday && !completed && 'text-amber-600 font-medium',
+                              completed && 'text-muted-foreground'
+                            )}>
+                              {formatDue(task.due_date)}
+                            </span>
+                          </td>
+                          <td className="px-2 py-2.5 text-right">
+                            <button
+                              onClick={(e) => { e.stopPropagation(); setSelectedId(expanded ? null : task.id) }}
+                              className="p-1 hover:bg-muted rounded transition-colors"
+                            >
+                              {expanded
+                                ? <ChevronDown className="w-4 h-4 text-muted-foreground" />
+                                : <ChevronRight className="w-4 h-4 text-muted-foreground" />}
+                            </button>
+                          </td>
+                        </tr>
+                        {expanded && (
+                          <tr key={`${task.id}-detail`} className="bg-muted/20">
+                            <td colSpan={5} className="px-6 py-4">
+                              <div className="flex items-start justify-between gap-4">
+                                <div className="space-y-2 flex-1 min-w-0">
+                                  <h3 className="font-semibold">{task.title}</h3>
+                                  <div className="flex items-center gap-4 text-xs text-muted-foreground">
+                                    <span>Created {format(parseISO(task.created_at), 'MMM d, yyyy')}</span>
+                                    {task.completed_at && <span>Done {format(parseISO(task.completed_at), 'MMM d, yyyy')}</span>}
+                                  </div>
+                                </div>
+                                <div className="flex items-center gap-2 flex-shrink-0">
+                                  <Button
+                                    size="sm"
+                                    variant={completed ? 'outline' : 'default'}
+                                    onClick={() => toggleComplete(task)}
+                                  >
+                                    {completed ? 'Reopen' : 'Mark done'}
+                                  </Button>
+                                  <input
+                                    type="date"
+                                    defaultValue={task.due_date}
+                                    onChange={(e) => reschedule(task, e.target.value)}
+                                    className="h-7 text-xs border border-input rounded-md px-2 bg-background text-foreground"
+                                  />
+                                  <Button
+                                    size="sm"
+                                    variant="ghost"
+                                    className="text-muted-foreground hover:text-red-600"
+                                    onClick={() => removeTask(task)}
+                                  >
+                                    <Trash2 className="w-4 h-4" />
+                                  </Button>
+                                </div>
+                                <button
+                                  onClick={() => router.push(`/clients/${task.client_id}#tasks`)}
+                                  className="text-xs text-primary hover:underline mt-3 inline-block"
+                                >
+                                  Open case →
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        )}
+                      </>
                     )
                   })}
                 </tbody>
               </table>
-
-              {/* Expanded detail — outside the table for full-width */}
-              {selectedTask && (() => {
-                const status = taskStatus(selectedTask, today)
-                const completed = status === 'completed'
-                return (
-                  <div className="border-t bg-muted/20 px-6 py-4">
-                    <div className="flex items-start justify-between gap-4">
-                      <div className="space-y-2 flex-1 min-w-0">
-                        <h3 className="font-semibold">{selectedTask.title}</h3>
-                        <div className="flex items-center gap-4 text-xs text-muted-foreground">
-                          <span>Created {format(parseISO(selectedTask.created_at), 'MMM d, yyyy')}</span>
-                          {selectedTask.completed_at && <span>Done {format(parseISO(selectedTask.completed_at), 'MMM d, yyyy')}</span>}
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-2 flex-shrink-0">
-                        <Button
-                          size="sm"
-                          variant={completed ? 'outline' : 'default'}
-                          onClick={() => toggleComplete(selectedTask)}
-                        >
-                          {completed ? 'Reopen' : 'Mark done'}
-                        </Button>
-                        <input
-                          type="date"
-                          defaultValue={selectedTask.due_date}
-                          onChange={(e) => reschedule(selectedTask, e.target.value)}
-                          className="h-7 text-xs border border-input rounded-md px-2 bg-background text-foreground"
-                        />
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          className="text-muted-foreground hover:text-red-600"
-                          onClick={() => removeTask(selectedTask)}
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </Button>
-                      </div>
-                    </div>
-                    <button
-                      onClick={() => router.push(`/clients/${selectedTask.client_id}#tasks`)}
-                      className="text-xs text-primary hover:underline mt-3 inline-block"
-                    >
-                      Open case →
-                    </button>
-                  </div>
-                )
-              })()}
             </div>
           )}
 
