@@ -1,7 +1,6 @@
 import { NavRail, Breadcrumb } from '@/components/shared'
 import { GeneralSettings } from './general-settings'
 import { CsvImportExport } from './csv-import-export'
-import { LeadIngestion } from './lead-ingestion'
 
 export const metadata = { title: 'Settings — Aurora CRM' }
 
@@ -20,7 +19,6 @@ export default function SettingsPage() {
         <div className="container mx-auto px-4 py-6 space-y-6">
           <GeneralSettings />
           <CsvImportExport />
-          <LeadIngestion />
         </div>
       </main>
     </div>

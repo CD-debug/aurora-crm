@@ -13,7 +13,6 @@ const VALID_STAGES: PipelineStage[] = ['consultation', 'exit_plan', 'in_progress
 // (graceful degradation — the page still renders, just with no persisted state).
 const SETTINGS_DEFAULTS: Record<string, Record<string, unknown>> = {
   general: { company_name: 'Aurora CRM' },
-  lead_ingestion: { enabled: false, api_key: null, webhook_url: null },
   csv_import: { last_import_at: null, total_imported: 0, duplicates_skipped: 0 },
 }
 
@@ -47,17 +46,6 @@ export async function updateSettings(key: string, value: Record<string, unknown>
     throw error
   }
   revalidatePath('/settings')
-}
-
-export async function regenerateApiKey() {
-  const supabase = await createServerClient()
-  const { data, error } = await supabase.rpc('regenerate_api_key')
-  if (error) {
-    if (isMissingTable(error)) return null
-    throw error
-  }
-  revalidatePath('/settings')
-  return data as string | null
 }
 
 export async function exportClientsCsv() {
@@ -230,49 +218,4 @@ export async function importClientsFromCsv(csvText: string) {
   revalidatePath('/clients')
   revalidatePath('/settings')
   return { imported, duplicates }
-}
-
-export async function ingestLead(leadData: {
-  name: string
-  phone: string
-  email: string
-  state: string
-  zip: string
-  source?: string
-}) {
-  const { supabase, userId } = await requireUser()
-
-  const { data: existing } = await supabase
-    .from('clients')
-    .select('id, name, email, phone')
-
-  const matches = findDuplicates(existing ?? [], {
-    name: leadData.name,
-    email: leadData.email,
-    phone: leadData.phone,
-  })
-
-  if (matches.length > 0) {
-    throw new Error('Duplicate lead: this person already exists')
-  }
-
-  const { data: client, error: clientError } = await supabase
-    .from('clients')
-    .insert({
-      name: leadData.name,
-      phone: leadData.phone,
-      email: leadData.email,
-      state: leadData.state,
-      zip: leadData.zip,
-      stage: 'consultation',
-      tags: leadData.source ? [`lead:${leadData.source}`] : ['lead:api'],
-      author_id: userId,
-    })
-    .select()
-    .single()
-
-  if (clientError) throw clientError
-
-  revalidatePath('/clients')
-  return client.id
 }

@@ -1,7 +1,7 @@
 // Verify what the public-facing routes actually return.
 const fetch = global.fetch
 
-const routes = ['/', '/login', '/lead', '/lead/thanks', '/api/leads']
+const routes = ['/', '/login', '/lead', '/lead/thanks']
 for (const r of routes) {
   const res = await fetch(`https://aurora-crm-psi.vercel.app${r}`, { redirect: 'manual' })
   const text = await res.text()
