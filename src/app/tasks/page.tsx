@@ -7,13 +7,13 @@ import { format, isSameDay, parseISO, startOfDay } from 'date-fns'
 import { toast } from 'sonner'
 import {
   Calendar as CalendarIcon, CheckCircle, ChevronDown, ChevronRight,
-  Plus, Trash2, X,
+  ExternalLink, Plus, Trash2, User, X,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Calendar } from '@/components/ui/calendar'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { NavRail } from '@/components/shared'
+import { NavRail, ClientCombobox } from '@/components/shared'
 import { createClient } from '@/lib/supabase/client'
 import { fetchClients, fetchTasks, invalidateAfterMutation } from '@/lib/data/client-queries'
 import { queryKeys } from '@/lib/data/query-keys'
@@ -261,19 +261,26 @@ function TasksPageContent() {
           <div className="mb-4 p-4 rounded-lg border bg-card">
             <div className="flex items-center gap-3">
               {!filterClient && clients.length > 1 && (
-                <Select value={quickClient} onValueChange={(v) => setQuickClient(v ?? '')}>
-                  <SelectTrigger className="w-[160px]" aria-label="Task client"><SelectValue placeholder="Client…" /></SelectTrigger>
-                  <SelectContent>
-                    {clients.map((c) => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
-                  </SelectContent>
-                </Select>
+                <ClientCombobox
+                  clients={clients.map((c) => ({ id: c.id, name: c.name, health_status: c.health_status, state: c.state }))}
+                  value={quickClient || null}
+                  onChange={(v) => setQuickClient(v ?? '')}
+                  placeholder="Assign to client…"
+                  ariaLabel="Assign this task to a client"
+                  required
+                />
               )}
               <Input
                 value={quickTitle}
                 onChange={(e) => setQuickTitle(e.target.value)}
                 onKeyDown={(e) => { if (e.key === 'Enter') submitQuickAdd() }}
-                placeholder="New task — press Enter to add"
+                placeholder={
+                  effectiveClient
+                    ? `New task for ${clients.find((c) => c.id === effectiveClient)?.name ?? 'this client'}…`
+                    : 'Pick a client, then type a task…'
+                }
                 className="flex-1 min-w-[200px]"
+                disabled={!effectiveClient}
               />
               <span className="hidden sm:inline-flex text-xs text-muted-foreground items-center gap-1 whitespace-nowrap">
                 <CalendarIcon className="w-3 h-3" />
@@ -287,6 +294,28 @@ function TasksPageContent() {
                 Add
               </Button>
             </div>
+            {effectiveClient && (
+              <div className="mt-2 flex items-center gap-2 text-xs text-muted-foreground">
+                <span>Assigning to</span>
+                <a
+                  href={`/clients/${effectiveClient}`}
+                  className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-primary/10 text-primary hover:bg-primary/20 transition-colors font-medium"
+                  title="Open this client's full record"
+                >
+                  <User className="w-3 h-3" />
+                  {clients.find((c) => c.id === effectiveClient)?.name ?? 'Unknown client'}
+                  <ExternalLink className="w-2.5 h-2.5 opacity-60" />
+                </a>
+                {filterClient && (
+                  <button
+                    onClick={() => setParams({ client: null })}
+                    className="text-xs text-muted-foreground hover:text-foreground underline-offset-2 hover:underline"
+                  >
+                    Clear client filter
+                  </button>
+                )}
+              </div>
+            )}
           </div>
 
           {/* Task list */}
