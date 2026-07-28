@@ -31,7 +31,6 @@ export async function proxy(request: NextRequest) {
   const isPublicPath =
     pathname.startsWith('/login') ||
     pathname === '/auth/callback' ||
-    pathname === '/api/leads' ||
     pathname.startsWith('/lead')
 
   if (!user && !isPublicPath) {
