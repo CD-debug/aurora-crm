@@ -9,14 +9,14 @@
 import { useMemo, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { format } from 'date-fns'
+import { format, parseISO } from 'date-fns'
 import { toast } from 'sonner'
 import { motion } from 'framer-motion'
 import { ActivityTimeline } from '@/components/shared/ActivityTimeline'
 import {
   Calendar, Clock, DollarSign, Home, AlertTriangle, CheckCircle, Plus, Trash2,
   Mail, Phone, MessageSquare, FileText, Building2, Target, TrendingUp, Pencil,
-  CalendarClock, FileWarning, Percent,
+  CalendarClock, FileWarning, Percent, CalendarDays, Shield, MapPin,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -25,7 +25,7 @@ import { Badge } from '@/components/ui/badge'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription, SheetFooter } from '@/components/ui/sheet'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog'
-import { NavRail, Breadcrumb, AuroraArcStepper, ClientHealthBadge, StageBadge, TaskStatusBadge } from '@/components/shared'
+import { NavRail, Breadcrumb, AuroraArcStepper, ClientHealthBadge, StageBadge, TaskStatusBadge, CurrencyInput, YesNoToggle, ConditionalField, PhoneInput, SsnInput } from '@/components/shared'
 import { createClient } from '@/lib/supabase/client'
 import { fetchClient360, invalidateAfterMutation } from '@/lib/data/client-queries'
 import { queryKeys } from '@/lib/data/query-keys'
@@ -49,6 +49,9 @@ const EMPTY_PROPERTY_FORM = {
   resort_name: '', resort_location: '', unit_number: '',
   purchase_price: '', loan_balance: '', maintenance_fee: '',
   fee_due_date: '', document_reference: '',
+  usage_frequency: '', usage_type: '',
+  fees_current: true, fees_behind_amount: '', maintenance_fees_billed: '',
+  paid_off: false,
 }
 
 export default function Client360Page() {
@@ -138,6 +141,12 @@ export default function Client360Page() {
       maintenance_fee: p.maintenance_fee != null ? String(p.maintenance_fee) : '',
       fee_due_date: p.fee_due_date ?? '',
       document_reference: p.document_reference ?? '',
+      usage_frequency: p.usage_frequency ?? '',
+      usage_type: p.usage_type ?? '',
+      fees_current: p.fees_current,
+      fees_behind_amount: p.fees_behind_amount != null ? String(p.fees_behind_amount) : '',
+      maintenance_fees_billed: p.maintenance_fees_billed != null ? String(p.maintenance_fees_billed) : '',
+      paid_off: p.status === 'paid_off',
     })
     setPropertySheetOpen(true)
   }
@@ -150,12 +159,18 @@ export default function Client360Page() {
       resort_name: propertyForm.resort_name,
       resort_location: propertyForm.resort_location,
       unit_number: propertyForm.unit_number || null,
-      purchase_price: propertyForm.purchase_price ? Number(propertyForm.purchase_price) : null,
-      loan_balance: propertyForm.loan_balance ? Number(propertyForm.loan_balance) : null,
-      maintenance_fee: propertyForm.maintenance_fee ? Number(propertyForm.maintenance_fee) : null,
+      purchase_price: propertyForm.purchase_price ? Number(propertyForm.purchase_price.replace(/,/g, '')) : null,
+      loan_balance: propertyForm.paid_off ? null : (propertyForm.loan_balance ? Number(propertyForm.loan_balance.replace(/,/g, '')) : null),
+      maintenance_fee: propertyForm.maintenance_fee ? Number(propertyForm.maintenance_fee.replace(/,/g, '')) : null,
       fee_due_date: propertyForm.fee_due_date || null,
       document_reference: propertyForm.document_reference || null,
-    }
+      usage_frequency: (propertyForm.usage_frequency || null) as Property['usage_frequency'],
+      usage_type: (propertyForm.usage_type || null) as Property['usage_type'],
+      fees_current: propertyForm.fees_current,
+      fees_behind_amount: propertyForm.fees_current ? null : (propertyForm.fees_behind_amount ? Number(propertyForm.fees_behind_amount.replace(/,/g, '')) : null),
+      maintenance_fees_billed: propertyForm.maintenance_fees_billed ? Number(propertyForm.maintenance_fees_billed.replace(/,/g, '')) : null,
+      status: (propertyForm.paid_off ? 'paid_off' : 'active') as 'active' | 'paid_off',
+    } as Parameters<typeof createProperty>[0]
     try {
       if (editingProperty) {
         await updateProperty(editingProperty.id, clientId, payload)
@@ -281,13 +296,20 @@ export default function Client360Page() {
 
   // --- Edit client -------------------------------------------------------------
   const [editOpen, setEditOpen] = useState(false)
-  const [editForm, setEditForm] = useState({ name: '', phone: '', email: '', state: '', zip: '', tags: '' })
+  const [editForm, setEditForm] = useState({
+    name: '', phone: '', email: '', state: '', zip: '', tags: '',
+    co_client_name: '', dob: '', ssn_last4: '', address: '', phone2: '', retainer_fee: '',
+  })
   const [editSaving, setEditSaving] = useState(false)
 
   const openEdit = () => {
     if (!data) return
     const c = data.client
-    setEditForm({ name: c.name, phone: c.phone, email: c.email, state: c.state, zip: c.zip, tags: c.tags.join(', ') })
+    setEditForm({
+      name: c.name, phone: c.phone, email: c.email, state: c.state, zip: c.zip, tags: c.tags.join(', '),
+      co_client_name: c.co_client_name ?? '', dob: c.dob ?? '', ssn_last4: c.ssn_last4 ?? '',
+      address: c.address ?? '', phone2: c.phone2 ?? '', retainer_fee: c.retainer_fee != null ? String(c.retainer_fee) : '',
+    })
     setEditOpen(true)
   }
 
@@ -302,6 +324,12 @@ export default function Client360Page() {
         state: editForm.state,
         zip: editForm.zip,
         tags: editForm.tags ? editForm.tags.split(',').map((t) => t.trim()).filter(Boolean) : [],
+        co_client_name: editForm.co_client_name.trim() || null,
+        dob: editForm.dob || null,
+        ssn_last4: editForm.ssn_last4 || null,
+        address: editForm.address.trim() || null,
+        phone2: editForm.phone2.trim() || null,
+        retainer_fee: editForm.retainer_fee ? Number(editForm.retainer_fee.replace(/,/g, '')) : null,
       })
       await invalidateAfterMutation(queryClient, clientId)
       toast.success('Client details updated')
@@ -367,12 +395,16 @@ export default function Client360Page() {
             <div className="flex items-center justify-between gap-4 flex-wrap">
               <div className="flex items-center gap-3 flex-wrap">
                 <h1 className="text-xl md:text-2xl font-heading font-semibold">{client.name}</h1>
+                {client.co_client_name && (
+                  <span className="text-sm text-muted-foreground">& {client.co_client_name}</span>
+                )}
                 <ClientHealthBadge status={client.health_status} />
                 <StageBadge stage={client.stage} />
                 {client.tags.map((t) => <Badge key={t} variant="secondary" className="text-xs">{t}</Badge>)}
               </div>
-              <div className="flex items-center gap-3 text-sm text-muted-foreground">
+              <div className="flex items-center gap-3 text-sm text-muted-foreground flex-wrap">
                 <span className="font-mono">{client.phone}</span>
+                {client.phone2 && <span className="font-mono">· {client.phone2}</span>}
                 <span className="hidden md:inline">{client.email}</span>
                 <span>{client.state} {client.zip}</span>
                 <Button variant="outline" size="sm" onClick={openEdit}>
@@ -383,6 +415,48 @@ export default function Client360Page() {
             </div>
           </div>
         </header>
+
+        {/* Identity strip — DOB, masked SSN, address, retainer (from intake) */}
+        <div className="container mx-auto px-4 pt-4">
+          <div className="rounded-lg border bg-card px-4 py-3 flex items-center gap-x-6 gap-y-1 flex-wrap text-xs">
+            {client.dob && (
+              <div className="flex items-center gap-1.5">
+                <CalendarDays className="w-3.5 h-3.5 text-muted-foreground" />
+                <span className="text-muted-foreground">DOB</span>
+                <span className="font-mono tabular-nums">{format(parseISO(client.dob), 'MMM d, yyyy')}</span>
+              </div>
+            )}
+            {client.ssn_last4 && (
+              <div className="flex items-center gap-1.5">
+                <Shield className="w-3.5 h-3.5 text-muted-foreground" />
+                <span className="text-muted-foreground">SSN</span>
+                <span className="font-mono tabular-nums">•••• {client.ssn_last4}</span>
+              </div>
+            )}
+            {client.address && (
+              <div className="flex items-center gap-1.5">
+                <MapPin className="w-3.5 h-3.5 text-muted-foreground" />
+                <span className="text-muted-foreground">Address</span>
+                <span>{client.address}</span>
+              </div>
+            )}
+            {client.retainer_fee != null && client.retainer_fee > 0 && (
+              <div className="flex items-center gap-1.5">
+                <DollarSign className="w-3.5 h-3.5 text-muted-foreground" />
+                <span className="text-muted-foreground">Retainer</span>
+                <span className="font-mono tabular-nums">${client.retainer_fee.toLocaleString()}</span>
+              </div>
+            )}
+            {!client.dob && !client.ssn_last4 && !client.address && !client.retainer_fee && (
+              <button
+                onClick={openEdit}
+                className="text-muted-foreground hover:text-foreground transition-colors"
+              >
+                Add intake details (DOB, SSN, address, retainer) →
+              </button>
+            )}
+          </div>
+        </div>
 
         <div className="container mx-auto px-4 pb-10">
           {/* Aurora Arc stepper */}
@@ -722,9 +796,23 @@ export default function Client360Page() {
               <SheetDescription>A timeshare or fractional interest tied to this case.</SheetDescription>
             </SheetHeader>
             <form onSubmit={submitProperty} className="space-y-4 p-4">
+              {/* Ownership */}
               <div className="space-y-2">
                 <label className="text-sm font-medium">Property / Resort Name *</label>
-                <Input value={propertyForm.resort_name} onChange={(e) => setPropertyForm({ ...propertyForm, resort_name: e.target.value })} required />
+                <Input value={propertyForm.resort_name} onChange={(e) => setPropertyForm({ ...propertyForm, resort_name: e.target.value })} required list="common-resorts" />
+                <datalist id="common-resorts">
+                  <option value="Marriott Grand Vista" />
+                  <option value="Marriott Harbour Point" />
+                  <option value="Wyndham Grand Clearwater" />
+                  <option value="Wyndham Palm Aire" />
+                  <option value="Westgate Las Vegas Resort" />
+                  <option value="Westgate Palace" />
+                  <option value="Hyatt Regency Coconut Point" />
+                  <option value="Hilton Grand Vacations Strip" />
+                  <option value="Diamond Resorts Scottsdale" />
+                  <option value="Holiday Inn Club Vacations" />
+                  <option value="Bluegreen Resorts Carolina Pkwy" />
+                </datalist>
               </div>
               <div className="space-y-2">
                 <label className="text-sm font-medium">Location (City, State) *</label>
@@ -734,26 +822,83 @@ export default function Client360Page() {
                 <label className="text-sm font-medium">Unit / Title Number</label>
                 <Input value={propertyForm.unit_number} onChange={(e) => setPropertyForm({ ...propertyForm, unit_number: e.target.value })} />
               </div>
+              {/* Usage */}
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <label className="text-sm font-medium">Original Purchase Price ($)</label>
-                  <Input type="number" step="0.01" min="0" value={propertyForm.purchase_price} onChange={(e) => setPropertyForm({ ...propertyForm, purchase_price: e.target.value })} />
+                  <label className="text-sm font-medium">Usage Frequency</label>
+                  <select
+                    value={propertyForm.usage_frequency}
+                    onChange={(e) => setPropertyForm({ ...propertyForm, usage_frequency: e.target.value })}
+                    className="w-full rounded-lg border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+                  >
+                    <option value="">Select…</option>
+                    <option value="annual">Annual</option>
+                    <option value="biennial">Biennial</option>
+                    <option value="odd_year">Odd Year</option>
+                    <option value="even_year">Even Year</option>
+                  </select>
                 </div>
                 <div className="space-y-2">
-                  <label className="text-sm font-medium">Current Loan Balance ($)</label>
-                  <Input type="number" step="0.01" min="0" value={propertyForm.loan_balance} onChange={(e) => setPropertyForm({ ...propertyForm, loan_balance: e.target.value })} />
+                  <label className="text-sm font-medium">Usage Type</label>
+                  <select
+                    value={propertyForm.usage_type}
+                    onChange={(e) => setPropertyForm({ ...propertyForm, usage_type: e.target.value })}
+                    className="w-full rounded-lg border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+                  >
+                    <option value="">Select…</option>
+                    <option value="fixed_week">Fixed Week</option>
+                    <option value="floating_week">Floating Week</option>
+                    <option value="points_based">Points-Based</option>
+                  </select>
                 </div>
+              </div>
+              {/* Pricing */}
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Original Purchase Price</label>
+                <CurrencyInput value={propertyForm.purchase_price} onChange={(v) => setPropertyForm({ ...propertyForm, purchase_price: v })} />
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Maintenance Fees Billed (total to date)</label>
+                <CurrencyInput value={propertyForm.maintenance_fees_billed} onChange={(v) => setPropertyForm({ ...propertyForm, maintenance_fees_billed: v })} />
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <label className="text-sm font-medium">Annual Maintenance Fee ($)</label>
-                  <Input type="number" step="0.01" min="0" value={propertyForm.maintenance_fee} onChange={(e) => setPropertyForm({ ...propertyForm, maintenance_fee: e.target.value })} />
+                  <label className="text-sm font-medium">Current Annual Maintenance Fee</label>
+                  <CurrencyInput value={propertyForm.maintenance_fee} onChange={(v) => setPropertyForm({ ...propertyForm, maintenance_fee: v })} />
                 </div>
                 <div className="space-y-2">
                   <label className="text-sm font-medium">Next Fee Due Date</label>
                   <Input type="date" value={propertyForm.fee_due_date} onChange={(e) => setPropertyForm({ ...propertyForm, fee_due_date: e.target.value })} />
                 </div>
               </div>
+              {/* Fee status + conditional "how far behind" */}
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Current on Fees?</label>
+                <YesNoToggle
+                  value={propertyForm.fees_current}
+                  onChange={(v) => setPropertyForm({ ...propertyForm, fees_current: v })}
+                />
+              </div>
+              <ConditionalField show={!propertyForm.fees_current}>
+                <div className="space-y-2 pt-2 pl-1">
+                  <label className="text-sm font-medium">How far behind?</label>
+                  <CurrencyInput value={propertyForm.fees_behind_amount} onChange={(v) => setPropertyForm({ ...propertyForm, fees_behind_amount: v })} />
+                </div>
+              </ConditionalField>
+              {/* Paid off toggle + conditional mortgage owed */}
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Paid Off?</label>
+                <YesNoToggle
+                  value={propertyForm.paid_off}
+                  onChange={(v) => setPropertyForm({ ...propertyForm, paid_off: v, loan_balance: v ? '' : propertyForm.loan_balance })}
+                />
+              </div>
+              <ConditionalField show={!propertyForm.paid_off}>
+                <div className="space-y-2 pt-2 pl-1">
+                  <label className="text-sm font-medium">Mortgage Amount Owed</label>
+                  <CurrencyInput value={propertyForm.loan_balance} onChange={(v) => setPropertyForm({ ...propertyForm, loan_balance: v })} />
+                </div>
+              </ConditionalField>
               <div className="space-y-2">
                 <label className="text-sm font-medium">Document URL</label>
                 <Input value={propertyForm.document_reference} onChange={(e) => setPropertyForm({ ...propertyForm, document_reference: e.target.value })} placeholder="https://…" />
@@ -797,13 +942,37 @@ export default function Client360Page() {
               <SheetDescription>Contact details and tags for {client.name}.</SheetDescription>
             </SheetHeader>
             <form onSubmit={submitEdit} className="space-y-4 p-4">
+              {/* Identity */}
               <div className="space-y-2">
                 <label className="text-sm font-medium">Full Name *</label>
                 <Input value={editForm.name} onChange={(e) => setEditForm({ ...editForm, name: e.target.value })} required />
               </div>
               <div className="space-y-2">
+                <label className="text-sm font-medium">Co-Client (2)</label>
+                <Input value={editForm.co_client_name} onChange={(e) => setEditForm({ ...editForm, co_client_name: e.target.value })} placeholder="Second client on the case" />
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Date of Birth</label>
+                  <Input type="date" value={editForm.dob} onChange={(e) => setEditForm({ ...editForm, dob: e.target.value })} />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Last 4 of SSN</label>
+                  <SsnInput value={editForm.ssn_last4} onChange={(v) => setEditForm({ ...editForm, ssn_last4: v })} />
+                </div>
+              </div>
+              {/* Contact */}
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Address</label>
+                <Input value={editForm.address} onChange={(e) => setEditForm({ ...editForm, address: e.target.value })} placeholder="Street, City" />
+              </div>
+              <div className="space-y-2">
                 <label className="text-sm font-medium">Phone *</label>
-                <Input type="tel" value={editForm.phone} onChange={(e) => setEditForm({ ...editForm, phone: e.target.value })} required />
+                <PhoneInput value={editForm.phone} onChange={(v) => setEditForm({ ...editForm, phone: v })} required />
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Phone (2)</label>
+                <PhoneInput value={editForm.phone2} onChange={(v) => setEditForm({ ...editForm, phone2: v })} />
               </div>
               <div className="space-y-2">
                 <label className="text-sm font-medium">Email *</label>
@@ -818,6 +987,11 @@ export default function Client360Page() {
                   <label className="text-sm font-medium">ZIP *</label>
                   <Input value={editForm.zip} onChange={(e) => setEditForm({ ...editForm, zip: e.target.value })} required maxLength={10} />
                 </div>
+              </div>
+              {/* Engagement */}
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Retainer Fee</label>
+                <CurrencyInput value={editForm.retainer_fee} onChange={(v) => setEditForm({ ...editForm, retainer_fee: v })} />
               </div>
               <div className="space-y-2">
                 <label className="text-sm font-medium">Tags</label>
@@ -913,11 +1087,25 @@ function PropertyCard({
           <p className="text-sm text-muted-foreground">
             {p.resort_location}{p.unit_number ? ` · Unit ${p.unit_number}` : ''}
           </p>
+          {(p.usage_frequency || p.usage_type) && (
+            <div className="flex flex-wrap gap-x-3 gap-y-1 mt-1 text-xs text-muted-foreground">
+              {p.usage_frequency && <span>Usage: {p.usage_frequency.replace('_', ' ')}</span>}
+              {p.usage_type && <span>Type: {p.usage_type.replace('_', '-')}</span>}
+            </div>
+          )}
+          {!isPaid && p.fees_current === false && (
+            <p className="text-xs text-amber-700 mt-1 font-medium">
+              Behind on fees{p.fees_behind_amount != null ? ` — ${Number(p.fees_behind_amount).toLocaleString('en-US', { style: 'currency', currency: 'USD' })}` : ''}
+            </p>
+          )}
           <div className="flex flex-wrap gap-x-4 gap-y-1 mt-2 text-sm text-muted-foreground font-mono tabular-nums">
             {p.purchase_price != null && <span>Purchase: ${Number(p.purchase_price).toLocaleString()}</span>}
             {!isPaid && p.loan_balance != null && <span>Owed: ${Number(p.loan_balance).toLocaleString()}</span>}
             {isPaid && p.value_eliminated != null && (
               <span className="text-green-700">Eliminated: ${Number(p.value_eliminated).toLocaleString()}</span>
+            )}
+            {p.maintenance_fees_billed != null && (
+              <span>Billed to date: ${Number(p.maintenance_fees_billed).toLocaleString()}</span>
             )}
             {p.maintenance_fee != null && (
               <span>
