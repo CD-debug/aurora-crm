@@ -8,7 +8,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type { QueryClient } from '@tanstack/react-query'
 import { queryKeys } from './query-keys'
-import type { Client360, ClientWithHealth, Note, Property, Task, TaskWithClient } from './types'
+import type { Client360, ClientWithHealth, Note, NoteAuthor, Property, Task, TaskWithClient } from './types'
 
 /**
  * Call after any successful server action: refreshes every client-side view
@@ -50,7 +50,7 @@ export async function fetchClient360(supabase: SupabaseClient, clientId: string)
   const [clientRes, propsRes, notesRes, tasksRes] = await Promise.all([
     supabase.from('clients_with_health').select('*').eq('id', clientId).single(),
     supabase.from('properties').select('*').eq('client_id', clientId).order('created_at', { ascending: true }),
-    supabase.from('notes').select('*').eq('client_id', clientId).order('created_at', { ascending: false }),
+    supabase.from('notes').select('*, note_authors(name)').eq('client_id', clientId).order('pinned', { ascending: false }).order('created_at', { ascending: false }),
     supabase.from('tasks').select('*').eq('client_id', clientId).order('due_date', { ascending: true }),
   ])
   if (clientRes.error) throw new Error(`Couldn't load this client: ${clientRes.error.message}`)
@@ -63,6 +63,15 @@ export async function fetchClient360(supabase: SupabaseClient, clientId: string)
     notes: notesRes.data as Note[],
     tasks: tasksRes.data as Task[],
   }
+}
+
+export async function fetchNoteAuthors(supabase: SupabaseClient): Promise<NoteAuthor[]> {
+  const { data, error } = await supabase
+    .from('note_authors')
+    .select('*')
+    .order('created_at', { ascending: true })
+  if (error) throw new Error(`Couldn't load note authors: ${error.message}`)
+  return data as NoteAuthor[]
 }
 
 export async function fetchTasks(supabase: SupabaseClient): Promise<TaskWithClient[]> {

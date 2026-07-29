@@ -11,7 +11,7 @@ import { z } from 'zod'
 import { createServerClient } from '@/lib/supabase/server'
 import { findDuplicates } from './domain'
 import { clientInput } from './schemas'
-import type { Client, Note, PipelineStage, Property, Task } from './types'
+import type { Client, Note, NoteAuthor, PipelineStage, Property, Task } from './types'
 
 export async function requireUser() {
   const supabase = await createServerClient()
@@ -203,6 +203,7 @@ const noteInput = z.object({
   client_id: z.string().uuid(),
   channel: z.enum(['email', 'phone', 'text']),
   content: z.string().trim().min(1, "Can't save an empty note").max(5000),
+  staff_id: z.string().uuid().nullable().optional(),
 })
 
 export async function createNote(input: z.input<typeof noteInput>) {
@@ -211,12 +212,32 @@ export async function createNote(input: z.input<typeof noteInput>) {
 
   const { data: note, error } = await supabase
     .from('notes')
-    .insert({ ...data, author_id: userId })
-    .select()
+    .insert({ ...data, author_id: userId, staff_id: data.staff_id ?? null })
+    .select('*, note_authors(name)')
     .single()
   if (error) fail(error)
   revalidate(data.client_id)
   return note as Note
+}
+
+export async function updateNote(noteId: string, clientId: string, content: string) {
+  const { supabase } = await requireUser()
+  const trimmed = content.trim()
+  if (!trimmed) throw new Error("Can't save an empty note")
+
+  const { error } = await supabase
+    .from('notes')
+    .update({ content: trimmed, updated_at: new Date().toISOString() })
+    .eq('id', noteId)
+  if (error) fail(error)
+  revalidate(clientId)
+}
+
+export async function toggleNotePin(noteId: string, clientId: string, pinned: boolean) {
+  const { supabase } = await requireUser()
+  const { error } = await supabase.from('notes').update({ pinned }).eq('id', noteId)
+  if (error) fail(error)
+  revalidate(clientId)
 }
 
 export async function deleteNote(noteId: string, clientId: string) {
@@ -224,6 +245,42 @@ export async function deleteNote(noteId: string, clientId: string) {
   const { error } = await supabase.from('notes').delete().eq('id', noteId)
   if (error) fail(error)
   revalidate(clientId)
+}
+
+// ---------------------------------------------------------------------------
+// Note Authors — named people for attribution (single-login env)
+// ---------------------------------------------------------------------------
+
+const authorInput = z.object({
+  name: z.string().trim().min(1, 'Name is required').max(80),
+})
+
+export async function listNoteAuthors(): Promise<NoteAuthor[]> {
+  const { supabase } = await requireUser()
+  const { data, error } = await supabase
+    .from('note_authors')
+    .select('*')
+    .order('name', { ascending: true })
+  if (error) fail(error)
+  return data as NoteAuthor[]
+}
+
+export async function createNoteAuthor(name: string): Promise<NoteAuthor> {
+  const { supabase, userId } = await requireUser()
+  const data = authorInput.parse({ name })
+  const { data: author, error } = await supabase
+    .from('note_authors')
+    .insert({ ...data, owner_id: userId })
+    .select()
+    .single()
+  if (error) fail(error)
+  return author as NoteAuthor
+}
+
+export async function deleteNoteAuthor(id: string): Promise<void> {
+  const { supabase } = await requireUser()
+  const { error } = await supabase.from('note_authors').delete().eq('id', id)
+  if (error) fail(error)
 }
 
 // ---------------------------------------------------------------------------
