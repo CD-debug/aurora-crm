@@ -645,10 +645,15 @@ export default function Client360Page() {
                 transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1], delay: 0.3 }}
                 id="notes" className="rounded-xl border bg-card scroll-mt-24"
               >
-                <div className="p-4 border-b">
+<div className="p-4 border-b">
                   <h2 className="text-lg font-semibold flex items-center gap-2">
                     <FileText className="w-5 h-5" />
-                    Notes &amp; Communication ({notes.length})
+                    Notes & Communication ({notes.length})
+                    {selectedAuthorId && noteAuthors.length > 0 && (
+                      <span className="ml-2 text-xs px-2 py-0.5 rounded-full bg-primary/10 text-primary font-medium">
+                        {noteAuthors.find((a) => a.id === selectedAuthorId)?.name}
+                      </span>
+                    )}
                   </h2>
                 </div>
                 <div className="p-4 border-b bg-muted/20">
@@ -666,7 +671,7 @@ export default function Client360Page() {
                     {noteAuthors.length > 0 && (
                       <Select value={selectedAuthorId ?? ''} onValueChange={(v) => setSelectedAuthorId(v || null)}>
                         <SelectTrigger className="w-[160px]" aria-label="Note author">
-                          <SelectValue placeholder="Your name" />
+                          <SelectValue placeholder={selectedAuthorId ? noteAuthors.find(a => a.id === selectedAuthorId)?.name || 'Your name' : 'Your name'} />
                         </SelectTrigger>
                         <SelectContent>
                           {noteAuthors.map((a) => (
@@ -707,8 +712,7 @@ export default function Client360Page() {
                           className={cn('p-4 hover:bg-muted/30 transition-colors group', note.pinned && 'bg-primary/5 border-l-2 border-primary')}
                         >
                           <div className="flex items-start gap-3">
-                            <div className="flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center"
-                              style={authorName ? { background: 'hsl(var(--primary) / 0.1)' } : { background: 'hsl(var(--primary) / 0.1)' }}>
+                            <div className="flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center bg-primary/10">
                               {authorName ? (
                                 <span className="text-xs font-semibold text-primary">{initials}</span>
                               ) : (
@@ -751,7 +755,7 @@ export default function Client360Page() {
                                   </button>
                                   <button
                                     onClick={() => handleTogglePin(note.id, !note.pinned)}
-                                    className={cn('p-1.5 rounded text-muted-foreground hover:bg-surface-warning/20 transition-colors', note.pinned && 'text-yellow-600')}
+                                    className={cn('p-1.5 rounded text-muted-foreground hover:bg-primary/10 transition-colors', note.pinned && 'text-primary')}
                                     aria-label={note.pinned ? 'Unpin note' : 'Pin note'}
                                     title={note.pinned ? 'Unpin note' : 'Pin note'}
                                   >
