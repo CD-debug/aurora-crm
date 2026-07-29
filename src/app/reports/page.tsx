@@ -68,32 +68,37 @@ export default async function ReportsPage() {
             </p>
           ) : (
             <div className="space-y-3">
-              {data.teamActivity.map((m) => (
-                <div key={m.id} className="space-y-1.5">
-                  <div className="flex items-center justify-between text-sm">
-                    <span className="font-medium">{m.name}</span>
-                    <span className="text-xs text-muted-foreground font-mono tabular-nums">
-                      {m.notes} note{m.notes !== 1 ? 's' : ''} · {m.tasksCompleted}/{m.tasksTotal} task{m.tasksTotal !== 1 ? 's' : ''}
-                    </span>
-                  </div>
-                  <div className="flex gap-1 h-2 rounded-full overflow-hidden bg-muted">
-                    {m.tasksTotal > 0 && (
-                      <div
-                        className="h-full bg-primary"
-                        style={{ width: `${(m.tasksCompleted / Math.max(m.tasksCompleted + (m.tasksTotal - m.tasksCompleted) + m.notes, 1)) * 100}%` }}
-                        title={`${m.tasksCompleted} tasks completed`}
-                      />
+              {data.teamActivity.map((m) => {
+                const total = m.tasksTotal + m.notes
+                return (
+                  <div key={m.id} className="space-y-1.5">
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="font-medium">{m.name}</span>
+                      <span className="text-xs text-muted-foreground font-mono tabular-nums">
+                        {m.notes} note{m.notes !== 1 ? 's' : ''} · {m.tasksCompleted}/{m.tasksTotal} task{m.tasksTotal !== 1 ? 's' : ''}
+                      </span>
+                    </div>
+                    {total > 0 && (
+                      <div className="flex gap-1 h-2 rounded-full overflow-hidden bg-muted">
+                        {m.tasksTotal > 0 && (
+                          <div
+                            className="h-full bg-primary"
+                            style={{ width: `${(m.tasksTotal / total) * 100}%` }}
+                            title={`${m.tasksTotal} task${m.tasksTotal !== 1 ? 's' : ''} (${m.tasksCompleted} done)`}
+                          />
+                        )}
+                        {m.notes > 0 && (
+                          <div
+                            className="h-full bg-chart-2"
+                            style={{ width: `${(m.notes / total) * 100}%` }}
+                            title={`${m.notes} note${m.notes !== 1 ? 's' : ''}`}
+                          />
+                        )}
+                      </div>
                     )}
-                    {m.notes > 0 && (
-                      <div
-                        className="h-full bg-chart-2"
-                        style={{ width: `${(m.notes / Math.max(m.tasksTotal + m.notes, 1)) * 100}%` }}
-                        title={`${m.notes} notes`}
-                      />
-                    )}
                   </div>
-                </div>
-              ))}
+                )
+              })}
               {(data.unassignedActivity.notes > 0 || data.unassignedActivity.tasksTotal > 0) && (
                 <div className="space-y-1.5 pt-2 border-t">
                   <div className="flex items-center justify-between text-sm">

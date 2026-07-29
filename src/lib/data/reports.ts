@@ -43,9 +43,6 @@ export async function getReportData() {
   const totalLoanBalance = properties?.reduce((sum, p) => sum + (p.loan_balance ?? 0), 0) ?? 0
 
   // Per-team-member activity
-  const memberName = new Map<string, string>()
-  for (const m of teamMembers ?? []) memberName.set(m.id, m.name)
-
   type ActivityRow = { id: string; name: string; notes: number; tasksTotal: number; tasksCompleted: number; lastActive: string | null }
   const byMember: ActivityRow[] = []
   const unassignedActivity: ActivityRow = { id: 'unassigned', name: 'Unassigned', notes: 0, tasksTotal: 0, tasksCompleted: 0, lastActive: null }
@@ -73,7 +70,7 @@ export async function getReportData() {
   unassignedActivity.tasksTotal = (tasks ?? []).filter((t) => !t.staff_id || !knownIds.has(t.staff_id)).length
   unassignedActivity.tasksCompleted = (tasks ?? []).filter((t) => (t.completed_at) && (!t.staff_id || !knownIds.has(t.staff_id))).length
 
-  // Sort by activity (notes + tasks) desc
+  // Sort by total activity desc
   byMember.sort((a, b) => (b.notes + b.tasksTotal) - (a.notes + a.tasksTotal))
 
   return {
