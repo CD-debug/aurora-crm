@@ -586,7 +586,7 @@ function TasksPageContent() {
           </div>
 
           {/* Main layout: list + right rail */}
-          <div className="grid grid-cols-1 lg:grid-cols-[1fr_280px] gap-6 items-start">
+          <div className="grid grid-cols-1 lg:grid-cols-[1fr_320px] gap-6 items-start">
 
             {/* Unified list */}
             <motion.div
@@ -644,8 +644,8 @@ function TasksPageContent() {
 
             {/* Right rail: calendar (toggle hides it below lg) */}
             <div className={cn('lg:sticky lg:top-6 space-y-3', !showCalendar && 'hidden lg:block')}>
-              <div className="p-5 rounded-2xl border border-border/60 bg-card shadow-sm">
-                <div className="flex items-center justify-between mb-3">
+              <div className="p-4 rounded-2xl border border-border/60 bg-card shadow-sm">
+                <div className="flex items-center justify-between mb-2">
                   <h3 className="font-heading text-sm font-semibold tracking-tight">Calendar</h3>
                   {filterDue && (
                     <button
@@ -657,17 +657,20 @@ function TasksPageContent() {
                     </button>
                   )}
                 </div>
-                <Calendar
-                  mode="single"
-                  selected={filterDue ? parseISO(filterDue) : undefined}
-                  onSelect={(day) => setParams({ due: day ? format(day, 'yyyy-MM-dd') : null })}
-                  modifiers={{ hasTasks: daysWithTasks, hasOverdue: daysWithOverdue }}
-                  modifiersClassNames={{
-                    hasTasks: 'rdp-day_hasTasks',
-                    hasOverdue: 'rdp-day_overdue',
-                  }}
-                />
-                <div className="flex items-center gap-4 pt-3 mt-3 border-t border-border/50 text-xs text-muted-foreground">
+                <div className="-mx-2">
+                  <Calendar
+                    mode="single"
+                    selected={filterDue ? parseISO(filterDue) : undefined}
+                    onSelect={(day) => setParams({ due: day ? format(day, 'yyyy-MM-dd') : null })}
+                    modifiers={{ hasTasks: daysWithTasks, hasOverdue: daysWithOverdue }}
+                    modifiersClassNames={{
+                      hasTasks: 'rdp-day_hasTasks',
+                      hasOverdue: 'rdp-day_overdue',
+                    }}
+                    className="[--cell-size:--spacing(6)] text-xs"
+                  />
+                </div>
+                <div className="flex items-center gap-4 pt-3 mt-2 border-t border-border/50 text-xs text-muted-foreground">
                   <span className="flex items-center gap-1.5"><span className="w-1.5 h-1.5 rounded-full bg-primary inline-block" /> tasks due</span>
                   <span className="flex items-center gap-1.5"><span className="w-1.5 h-1.5 rounded-full bg-red-500 inline-block" /> overdue</span>
                 </div>
