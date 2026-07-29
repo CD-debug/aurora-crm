@@ -8,7 +8,7 @@ import { toast } from 'sonner'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   Calendar as CalendarIcon, CheckCircle, ChevronDown,
-  ExternalLink, Flame, Plus, Trash2, User, X,
+  ExternalLink, Flame, Plus, Sun, Trash2, User, X,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -373,10 +373,13 @@ function TasksPageContent() {
         <button
           onClick={collapsible ? onToggle : undefined}
           className={cn(
-            'w-full flex items-center gap-2 px-4 sm:px-5 pt-5 pb-2 text-left',
-            collapsible && 'hover:bg-muted/30 transition-colors rounded-t-lg',
+            'w-full flex items-center gap-2 px-5 py-3.5 text-left',
+            collapsible && 'hover:bg-muted/50 transition-colors rounded-t-lg',
           )}
         >
+          {tone === 'danger' && <Flame className="w-4 h-4 text-chart-3 flex-shrink-0" />}
+          {tone === 'primary' && <Sun className="w-4 h-4 text-primary flex-shrink-0" />}
+          {tone === 'success' && <CheckCircle className="w-4 h-4 text-chart-5 flex-shrink-0" />}
           <span className={cn(
             'text-xs font-semibold uppercase tracking-wider',
             tone === 'danger' && 'text-chart-3',
@@ -389,7 +392,6 @@ function TasksPageContent() {
           <span className="text-xs font-mono tabular-nums text-muted-foreground/70">
             {groupTasks.length}
           </span>
-          {tone === 'danger' && <Flame className="w-3.5 h-3.5 text-chart-3" />}
           {collapsible && (
             <ChevronDown className={cn('w-3.5 h-3.5 ml-auto text-muted-foreground transition-transform', !isOpen && '-rotate-90')} />
           )}
@@ -432,23 +434,31 @@ function TasksPageContent() {
     <button
       onClick={() => setQuickFilter(quickFilter === key ? null : key)}
       className={cn(
-        'flex items-baseline gap-2 px-1 py-1 rounded transition-colors',
-        quickFilter === key ? 'opacity-100' : 'opacity-70 hover:opacity-100',
+        'group relative flex flex-col items-start gap-1 px-4 py-3 rounded-xl transition-all min-w-[120px]',
+        'border',
+        quickFilter === key
+          ? (opts?.danger ? 'bg-chart-3/5 border-chart-3/30 shadow-sm' : 'bg-primary/5 border-primary/30 shadow-sm')
+          : 'bg-card border-border hover:border-foreground/20 hover:shadow-sm',
       )}
     >
+      {quickFilter === key && (
+        <span className={cn(
+          'absolute left-0 top-3 bottom-3 w-0.5 rounded-r',
+          opts?.danger ? 'bg-chart-3' : 'bg-primary',
+        )} />
+      )}
       <span className={cn(
-        'text-2xl font-heading font-semibold tabular-nums',
-        opts?.danger && value > 0 ? 'text-chart-3' : 'text-foreground',
+        'text-3xl font-heading font-semibold tabular-nums leading-none tracking-tight',
+        opts?.danger && value > 0 && quickFilter !== key ? 'text-chart-3' : 'text-foreground',
       )}>
         {value}
       </span>
       <span className={cn(
-        'text-xs font-medium uppercase tracking-wide',
-        quickFilter === key ? 'text-foreground' : 'text-muted-foreground',
+        'text-[11px] font-medium uppercase tracking-wider',
+        quickFilter === key ? 'text-foreground/80' : 'text-muted-foreground',
       )}>
         {label}
       </span>
-      {quickFilter === key && <span className="block w-1.5 h-1.5 rounded-full bg-primary" />}
     </button>
   )
 
@@ -459,7 +469,7 @@ function TasksPageContent() {
         <div className="max-w-5xl mx-auto px-4 sm:px-6 py-8">
 
           {/* Header + stat strip */}
-          <div className="flex flex-wrap items-end justify-between gap-x-8 gap-y-4 mb-6">
+          <div className="flex flex-col gap-6 mb-8">
             <div>
               <h1 className="text-3xl font-heading font-semibold tracking-tight">Tasks</h1>
               <p className="text-sm text-muted-foreground mt-1">
@@ -468,7 +478,7 @@ function TasksPageContent() {
                   : `${counts.openTotal} open across ${clients.length} client${clients.length !== 1 ? 's' : ''}`}
               </p>
             </div>
-            <div className="flex items-center gap-5">
+            <div className="flex flex-wrap items-stretch gap-3">
               {statButton('overdue', 'Overdue', counts.overdue, { danger: true })}
               {statButton('today', 'Today', counts.today)}
               {statButton('week', 'This week', counts.week)}
@@ -477,8 +487,8 @@ function TasksPageContent() {
           </div>
 
           {/* Quick-add */}
-          <div className="rounded-xl border bg-card p-3 mb-4">
-            <div className="flex items-center gap-2">
+          <div className="rounded-2xl border border-border/60 bg-card p-5 mb-6 shadow-sm">
+            <div className="flex flex-wrap items-center gap-3">
               {!filterClient && clients.length > 1 && (
                 <ClientCombobox
                   clients={clients.map((c) => ({ id: c.id, name: c.name, health_status: c.health_status, state: c.state }))}
@@ -487,6 +497,7 @@ function TasksPageContent() {
                   placeholder="Client…"
                   ariaLabel="Assign this task to a client"
                   required
+                  className="w-[200px] shrink-0"
                 />
               )}
               <Input
@@ -498,12 +509,12 @@ function TasksPageContent() {
                     ? `Add a task for ${clients.find((c) => c.id === effectiveClient)?.name ?? 'this client'}…`
                     : 'Pick a client, then type a task…'
                 }
-                className="flex-1 min-w-[160px] border-0 shadow-none focus-visible:ring-0 bg-transparent"
+                className="flex-1 min-w-[200px] h-11"
                 disabled={!effectiveClient}
               />
               {teamMembers.length > 0 && (
                 <Select value={quickAssigneeId ?? ''} onValueChange={(v) => setQuickAssigneeId(v || null)}>
-                  <SelectTrigger className="w-[140px] border-0 shadow-none bg-muted/50" aria-label="Assign to team member"><SelectValue placeholder="Unassigned" /></SelectTrigger>
+                  <SelectTrigger className="w-[160px] h-11" aria-label="Assign to team member"><SelectValue placeholder="Unassigned" /></SelectTrigger>
                   <SelectContent>
                     {teamMembers.map((m) => (
                       <SelectItem key={m.id} value={m.id}>{m.name}</SelectItem>
@@ -511,16 +522,19 @@ function TasksPageContent() {
                   </SelectContent>
                 </Select>
               )}
-              <Button onClick={submitQuickAdd} disabled={saving || !quickTitle.trim() || !effectiveClient} size="sm">
-                <Plus className="w-4 h-4 mr-1" />
-                Add
+              <Button onClick={submitQuickAdd} disabled={saving || !quickTitle.trim() || !effectiveClient} className="w-auto min-w-[120px] h-11 shadow-sm">
+                <Plus className="w-4 h-4 mr-1.5" />
+                Add task
               </Button>
             </div>
-            <p className="px-1 pt-2 text-xs text-muted-foreground">
-              Enter to save · Due {filterDue ? format(parseISO(filterDue), 'MMM d, yyyy') : format(today, 'MMM d')}
+            <p className="mt-3 px-0.5 text-xs text-muted-foreground flex items-center gap-1.5 flex-wrap">
+              <span>Enter to save</span>
+              <span className="text-border mx-0.5">·</span>
+              <span>Due {filterDue ? format(parseISO(filterDue), 'MMM d, yyyy') : format(today, 'MMM d')}</span>
               {effectiveClient && (
                 <>
-                  {' · '}for{' '}
+                  <span className="text-border mx-0.5">·</span>
+                  <span>for</span>
                   <a href={`/clients/${effectiveClient}`} className="text-primary hover:underline">
                     {clients.find((c) => c.id === effectiveClient)?.name ?? 'client'}
                   </a>
@@ -529,19 +543,19 @@ function TasksPageContent() {
             </p>
           </div>
 
-          {/* Filter row */}
-          <div className="flex flex-wrap items-center gap-2 mb-4">
+{/* Filter row — clean, aligned, consistent heights */}
+          <div className="flex flex-wrap items-center gap-3 mb-6">
             <Select value={filterClient || 'any'} onValueChange={(v) => setParams({ client: v === 'any' ? null : v })}>
-              <SelectTrigger className="w-[160px] h-9" aria-label="Filter by client"><SelectValue /></SelectTrigger>
+              <SelectTrigger className="w-[180px] h-10" aria-label="Filter by client"><SelectValue placeholder="All clients" /></SelectTrigger>
               <SelectContent>
-                <SelectItem value="any">All Clients</SelectItem>
+                <SelectItem value="any">All clients</SelectItem>
                 {clients.map((c) => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
               </SelectContent>
             </Select>
 
             {teamMembers.length > 0 && (
               <Select value={filterAssignee || 'any'} onValueChange={(v) => setParams({ assignee: v === 'any' ? null : v })}>
-                <SelectTrigger className="w-[150px] h-9" aria-label="Filter by assignee"><SelectValue /></SelectTrigger>
+                <SelectTrigger className="w-[160px] h-10" aria-label="Filter by assignee"><SelectValue placeholder="Anyone" /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="any">Anyone</SelectItem>
                   <SelectItem value="unassigned">Unassigned</SelectItem>
@@ -551,35 +565,35 @@ function TasksPageContent() {
             )}
 
             {filterDue && (
-              <span className="flex items-center gap-1.5 text-xs bg-muted rounded-md px-2.5 py-1.5">
-                <CalendarIcon className="w-3.5 h-3.5" />
+              <span className="inline-flex items-center gap-1.5 text-sm bg-muted/50 rounded-lg px-3 py-1.5 h-10">
+                <CalendarIcon className="w-4 h-4" />
                 {format(parseISO(filterDue), 'MMM d, yyyy')}
-                <button onClick={() => setParams({ due: null })} className="hover:text-foreground" aria-label="Clear date filter"><X className="w-3.5 h-3.5" /></button>
+                <button onClick={() => setParams({ due: null })} className="hover:text-foreground" aria-label="Clear date filter"><X className="w-4 h-4" /></button>
               </span>
             )}
 
             {(hasFilters || quickFilter) && (
-              <Button variant="ghost" size="sm" className="h-9" onClick={() => { router.replace('/tasks'); setQuickFilter(null) }}>
-                <X className="w-4 h-4 mr-1" />
+              <Button variant="outline" size="sm" className="h-10 gap-1.5" onClick={() => { router.replace('/tasks'); setQuickFilter(null) }}>
+                <X className="w-4 h-4" />
                 Clear
               </Button>
             )}
 
-            <Button variant="ghost" size="sm" className="gap-1.5 ml-auto lg:hidden h-9" onClick={() => setShowCalendar(!showCalendar)}>
+            <Button variant="outline" size="sm" className="gap-1.5 ml-auto lg:hidden h-10" onClick={() => setShowCalendar(!showCalendar)}>
               <CalendarIcon className="w-4 h-4" />
-              {showCalendar ? 'Hide calendar' : 'Calendar'}
+              {showCalendar ? 'Hide calendar' : 'Show calendar'}
             </Button>
           </div>
 
           {/* Main layout: list + right rail */}
-          <div className="grid grid-cols-1 lg:grid-cols-[1fr_300px] gap-8 items-start">
+          <div className="grid grid-cols-1 lg:grid-cols-[1fr_280px] gap-6 items-start">
 
             {/* Unified list */}
             <motion.div
               initial={{ opacity: 0, y: 8 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
-              className="rounded-xl border bg-card"
+              className="bg-card rounded-2xl overflow-hidden border border-border/60 shadow-sm"
             >
               {isLoading ? (
                 <div className="p-5 space-y-3" aria-label="Loading tasks">
@@ -603,7 +617,7 @@ function TasksPageContent() {
                   )}
                 </div>
               ) : (
-                <div className="pb-2">
+                <div>
                   {showGroup('overdue') && <GroupSection label="Overdue" tasks={groups.overdue} tone="danger" />}
                   {showGroup('today') && <GroupSection label="Today" tasks={groups.today} tone="primary" />}
                   {showGroup('tomorrow') && <GroupSection label="Tomorrow" tasks={groups.tomorrow} />}
@@ -629,8 +643,20 @@ function TasksPageContent() {
             </motion.div>
 
             {/* Right rail: calendar (toggle hides it below lg) */}
-            <div className={cn('lg:sticky lg:top-6', !showCalendar && 'hidden lg:block')}>
-              <div className="p-4 rounded-xl border bg-card">
+            <div className={cn('lg:sticky lg:top-6 space-y-3', !showCalendar && 'hidden lg:block')}>
+              <div className="p-5 rounded-2xl border border-border/60 bg-card shadow-sm">
+                <div className="flex items-center justify-between mb-3">
+                  <h3 className="font-heading text-sm font-semibold tracking-tight">Calendar</h3>
+                  {filterDue && (
+                    <button
+                      onClick={() => setParams({ due: null })}
+                      className="text-xs text-muted-foreground hover:text-foreground"
+                      aria-label="Clear date"
+                    >
+                      Reset
+                    </button>
+                  )}
+                </div>
                 <Calendar
                   mode="single"
                   selected={filterDue ? parseISO(filterDue) : undefined}
@@ -641,17 +667,28 @@ function TasksPageContent() {
                     hasOverdue: 'rdp-day_overdue',
                   }}
                 />
-                <div className="flex items-center gap-4 px-2 pt-2 text-xs text-muted-foreground">
+                <div className="flex items-center gap-4 pt-3 mt-3 border-t border-border/50 text-xs text-muted-foreground">
                   <span className="flex items-center gap-1.5"><span className="w-1.5 h-1.5 rounded-full bg-primary inline-block" /> tasks due</span>
                   <span className="flex items-center gap-1.5"><span className="w-1.5 h-1.5 rounded-full bg-red-500 inline-block" /> overdue</span>
                 </div>
-                {selectedTask && (
-                  <div className="mt-3 pt-3 border-t text-xs text-muted-foreground">
-                    <span className="font-medium text-foreground">{selectedTask.title}</span>
-                    <span className="block mt-0.5">Due {format(parseISO(selectedTask.due_date), 'MMM d, yyyy')}</span>
-                  </div>
-                )}
               </div>
+              {selectedTask && (
+                <div className="p-4 rounded-2xl border border-border/60 bg-card shadow-sm">
+                  <p className="font-heading text-sm font-semibold tracking-tight">{selectedTask.title}</p>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Due {format(parseISO(selectedTask.due_date), 'MMM d, yyyy')}
+                    {selectedTask.clients?.name && (
+                      <> · {selectedTask.clients.name}</>
+                    )}
+                  </p>
+                  <button
+                    onClick={() => router.push(`/clients/${selectedTask.client_id}#tasks`)}
+                    className="mt-2 text-xs text-primary hover:underline inline-flex items-center gap-1"
+                  >
+                    Open case <ExternalLink className="w-3 h-3" />
+                  </button>
+                </div>
+              )}
             </div>
           </div>
         </div>
