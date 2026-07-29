@@ -7,7 +7,6 @@ import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Badge } from '@/components/ui/badge'
 import { toast } from 'sonner'
 import { motion } from 'framer-motion'
 import { AuroraMark } from '@/components/shared'
@@ -38,11 +37,6 @@ export default function LoginForm() {
     }
   }
 
-  const fillDemo = () => {
-    setEmail('demo@auroracrm.com')
-    setPassword('Aurora2026!')
-  }
-
   return (
     <div className="min-h-screen grid grid-cols-1 lg:grid-cols-[1fr_1.1fr]">
       {/* Left brand panel */}
@@ -55,14 +49,9 @@ export default function LoginForm() {
             </span>
           </div>
         </div>
-        <div className="space-y-6">
-          <p className="font-heading text-3xl leading-tight text-background font-normal tracking-[-0.02em]">
-            Case management for timeshare exit.
-          </p>
-          <p className="text-sm text-background/40 font-mono">
-            v2.0 · trusted by 47 firms
-          </p>
-        </div>
+        <p className="font-heading text-3xl leading-tight text-background font-normal tracking-[-0.02em]">
+          Case management for timeshare exit.
+        </p>
       </div>
 
       {/* Right form panel */}
@@ -119,24 +108,12 @@ export default function LoginForm() {
             </Button>
           </form>
 
-          <div className="mt-6 pt-5 border-t border-border space-y-3">
-            <div className="flex items-center justify-center gap-2 text-xs text-muted-foreground">
-              <span>Demo access:</span>
-              <Badge
-                variant="outline"
-                className="cursor-pointer font-mono text-xs hover:bg-muted/40"
-                onClick={fillDemo}
-              >
-                demo@auroracrm.com
-              </Badge>
-            </div>
-            <p className="text-xs text-muted-foreground text-center">
-              New timeshare inquiry?{' '}
-              <Link href="/lead" className="text-primary hover:underline">
-                Get a free consultation
-              </Link>
-            </p>
-          </div>
+          <p className="mt-6 pt-5 border-t border-border text-xs text-muted-foreground text-center">
+            New timeshare inquiry?{' '}
+            <Link href="/lead" className="text-primary hover:underline">
+              Get a free consultation
+            </Link>
+          </p>
         </motion.div>
       </div>
     </div>
