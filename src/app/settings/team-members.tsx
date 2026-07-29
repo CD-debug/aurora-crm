@@ -1,7 +1,8 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Plus, Trash2, X, Check, Loader2, Users } from 'lucide-react'
+import Link from 'next/link'
+import { Plus, Trash2, X, Check, Loader2, Users, BarChart3 } from 'lucide-react'
 import { listTeamMembers, createTeamMember, deleteTeamMember } from '@/lib/data/mutations'
 import type { TeamMember } from '@/lib/data/types'
 import { toast } from 'sonner'
@@ -116,7 +117,12 @@ export function TeamMembers() {
               key={member.id}
               className="flex items-center justify-between p-3 rounded-lg bg-background border hover:bg-muted/50 transition-colors"
             >
-              <span className="font-medium">{member.name}</span>
+              <div className="flex items-center gap-3 min-w-0">
+                <span className="inline-flex items-center justify-center w-8 h-8 rounded-full bg-primary/10 text-primary text-xs font-semibold flex-shrink-0">
+                  {member.name.split(' ').map((n) => n[0]).join('').toUpperCase().slice(0, 2)}
+                </span>
+                <span className="font-medium">{member.name}</span>
+              </div>
               {confirmDeleteId === member.id ? (
                 <div className="flex items-center gap-1">
                   <button
@@ -146,6 +152,18 @@ export function TeamMembers() {
             </li>
           ))}
         </ul>
+      )}
+      {members.length > 0 && (
+        <div className="mt-4 pt-4 border-t text-xs text-muted-foreground flex items-center justify-between">
+          <span>Names you add here appear as the “Author” dropdown in notes and “Assigned to” in tasks.</span>
+          <Link
+            href="/reports"
+            className="inline-flex items-center gap-1 text-primary hover:underline font-medium"
+          >
+            <BarChart3 className="w-3.5 h-3.5" />
+            See team activity
+          </Link>
+        </div>
       )}
     </div>
   )

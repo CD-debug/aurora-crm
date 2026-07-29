@@ -674,7 +674,7 @@ export default function Client360Page() {
                   </h2>
                   {teamMembers.length > 0 && (
                     <Select value={noteFilterMemberId} onValueChange={(v) => setNoteFilterMemberId(v as typeof noteFilterMemberId)}>
-                      <SelectTrigger className="w-[170px] h-8 text-xs" aria-label="Filter notes by member">
+                      <SelectTrigger className="w-[170px]" aria-label="Filter notes by member">
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>

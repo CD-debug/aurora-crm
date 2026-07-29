@@ -44,6 +44,7 @@ function TasksPageContent() {
   const filterClient = searchParams.get('client') ?? ''
   const filterStatus = searchParams.get('status') ?? ''
   const filterDue = searchParams.get('due') ?? ''
+  const filterAssignee = searchParams.get('assignee') ?? ''
   const view = searchParams.get('view') === 'all' ? 'all' : 'focus'
 
   const setParams = (updates: Record<string, string | null>) => {
@@ -69,6 +70,8 @@ function TasksPageContent() {
       const status = taskStatus(t, today)
       if (filterClient && t.client_id !== filterClient) return false
       if (filterStatus && status !== filterStatus) return false
+      if (filterAssignee === 'unassigned' && t.staff_id) return false
+      if (filterAssignee && filterAssignee !== 'unassigned' && t.staff_id !== filterAssignee) return false
       if (filterDue) {
         if (t.due_date !== filterDue) return false
       } else if (!filterStatus && view === 'focus') {
@@ -77,7 +80,7 @@ function TasksPageContent() {
       }
       return true
     })
-  }, [tasks, filterClient, filterStatus, filterDue, view, today])
+  }, [tasks, filterClient, filterStatus, filterAssignee, filterDue, view, today])
 
   const { daysWithTasks, daysWithOverdue } = useMemo(() => {
     const withTasks = new Set<string>()
@@ -168,7 +171,7 @@ function TasksPageContent() {
     }
   }
 
-  const hasFilters = !!(filterClient || filterStatus || filterDue)
+  const hasFilters = !!(filterClient || filterStatus || filterDue || filterAssignee)
 
   const formatDue = (dateStr: string) => {
     const d = startOfDay(parseISO(dateStr))
@@ -257,6 +260,17 @@ function TasksPageContent() {
                   {clients.map((c) => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
                 </SelectContent>
               </Select>
+
+              {teamMembers.length > 0 && (
+                <Select value={filterAssignee || 'any'} onValueChange={(v) => setParams({ assignee: v === 'any' ? null : v })}>
+                  <SelectTrigger className="w-[160px]" aria-label="Filter by assignee"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="any">Anyone</SelectItem>
+                    <SelectItem value="unassigned">Unassigned</SelectItem>
+                    {teamMembers.map((m) => <SelectItem key={m.id} value={m.id}>{m.name}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              )}
 
               {filterDue && (
                 <span className="flex items-center gap-1.5 text-sm bg-muted rounded-md px-2.5 py-1.5">
