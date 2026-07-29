@@ -1,7 +1,7 @@
 import { NavRail, PageHeader } from '@/components/shared'
 import { GeneralSettings } from './general-settings'
+import { TeamMembers } from './team-members'
 import { CsvImportExport } from './csv-import-export'
-import { NoteAuthors } from './note-authors'
 
 export const metadata = { title: 'Settings — Aurora CRM' }
 
@@ -17,7 +17,7 @@ export default function SettingsPage() {
         />
         <div className="container mx-auto px-4 py-6 space-y-6">
           <GeneralSettings />
-          <NoteAuthors />
+          <TeamMembers />
           <CsvImportExport />
         </div>
       </main>

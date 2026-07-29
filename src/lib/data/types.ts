@@ -9,7 +9,7 @@ export type TaskStatus = 'upcoming' | 'overdue' | 'completed' // derived, never 
 export type NoteChannel = 'email' | 'phone' | 'text'
 export type PropertyStatus = 'active' | 'paid_off'
 
-export interface NoteAuthor {
+export interface TeamMember {
   id: string
   owner_id: string
   name: string
@@ -74,13 +74,6 @@ export interface Property {
   maintenance_fees_billed: number | null
 }
 
-export interface NoteAuthor {
-  id: string
-  owner_id: string
-  name: string
-  created_at: string
-}
-
 export interface Note {
   id: string
   client_id: string
@@ -91,19 +84,21 @@ export interface Note {
   pinned: boolean
   created_at: string
   updated_at: string | null
-  note_authors: { name: string } | null
+  team_members: { name: string } | null
 }
 
 export interface Task {
   id: string
   client_id: string
   author_id: string
+  staff_id: string | null
   title: string
   description: string | null
   due_date: string // ISO date (yyyy-mm-dd)
   due_time: string | null
   completed_at: string | null
   created_at: string
+  team_members: { name: string } | null
 }
 
 export interface TaskWithClient extends Task {

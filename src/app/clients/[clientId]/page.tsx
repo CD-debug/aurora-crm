@@ -27,7 +27,7 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription, SheetFo
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog'
 import { NavRail, Breadcrumb, AuroraArcStepper, ClientHealthBadge, StageBadge, TaskStatusBadge, CurrencyInput, YesNoToggle, ConditionalField, PhoneInput, SsnInput } from '@/components/shared'
 import { createClient } from '@/lib/supabase/client'
-import { fetchClient360, fetchNoteAuthors, invalidateAfterMutation } from '@/lib/data/client-queries'
+import { fetchClient360, fetchTeamMembers, invalidateAfterMutation } from '@/lib/data/client-queries'
 import { queryKeys } from '@/lib/data/query-keys'
 import {
   createNote, deleteNote, updateNote, toggleNotePin, createProperty, updateProperty, setPropertyPaidOff, deleteProperty,
@@ -36,7 +36,7 @@ import {
 import {
   daysSince, financialProgress, isDueSoon, stagePercent, taskStatus, STAGE_LABELS,
 } from '@/lib/data/domain'
-import type { NoteChannel, PipelineStage, Property, NoteAuthor } from '@/lib/data/types'
+import type { NoteChannel, PipelineStage, Property, TeamMember } from '@/lib/data/types'
 import { cn } from '@/lib/utils'
 
 const CHANNEL_META: Record<NoteChannel, { label: string; icon: typeof Mail }> = {
@@ -86,11 +86,13 @@ export default function Client360Page() {
     }
   }
 
-  // --- Notes (inline quick-add, PRD §11.3) -----------------------------------
-  const { data: noteAuthors = [] } = useQuery({
-    queryKey: queryKeys.noteAuthors.all,
-    queryFn: () => fetchNoteAuthors(supabase),
+  // --- Team members (shared across notes + tasks) -----------------------------
+  const { data: teamMembers = [] } = useQuery({
+    queryKey: queryKeys.teamMembers.all,
+    queryFn: () => fetchTeamMembers(supabase),
   })
+
+  // --- Notes (inline quick-add, PRD §11.3) -----------------------------------
   const [noteChannel, setNoteChannel] = useState<NoteChannel>('phone')
   const [noteContent, setNoteContent] = useState('')
   const [noteSaving, setNoteSaving] = useState(false)
@@ -98,6 +100,7 @@ export default function Client360Page() {
     if (typeof window !== 'undefined') return localStorage.getItem('aurora-note-author')
     return null
   })
+  const [noteFilterMemberId, setNoteFilterMemberId] = useState<string | 'all'>('all')
   const [editingNoteId, setEditingNoteId] = useState<string | null>(null)
   const [editingContent, setEditingContent] = useState('')
 
@@ -267,12 +270,21 @@ export default function Client360Page() {
   const [taskTitle, setTaskTitle] = useState('')
   const [taskDue, setTaskDue] = useState('')
   const [taskSaving, setTaskSaving] = useState(false)
+  const [taskAssigneeId, setTaskAssigneeId] = useState<string | null>(() => {
+    if (typeof window !== 'undefined') return localStorage.getItem('aurora-task-assignee')
+    return null
+  })
 
   const submitTask = async () => {
     if (!taskTitle.trim() || !taskDue || taskSaving) return
     setTaskSaving(true)
     try {
-      await createTask({ client_id: clientId, title: taskTitle.trim(), due_date: taskDue })
+      await createTask({
+        client_id: clientId,
+        title: taskTitle.trim(),
+        due_date: taskDue,
+        staff_id: taskAssigneeId,
+      })
       await invalidateAfterMutation(queryClient, clientId)
       setTaskTitle('')
       setTaskDue('')
@@ -283,6 +295,11 @@ export default function Client360Page() {
       setTaskSaving(false)
     }
   }
+
+  useEffect(() => {
+    if (taskAssigneeId) localStorage.setItem('aurora-task-assignee', taskAssigneeId)
+    else localStorage.removeItem('aurora-task-assignee')
+  }, [taskAssigneeId])
 
   const handleToggleTask = async (taskId: string, completed: boolean) => {
     try {
@@ -645,16 +662,29 @@ export default function Client360Page() {
                 transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1], delay: 0.3 }}
                 id="notes" className="rounded-xl border bg-card scroll-mt-24"
               >
-                <div className="p-4 border-b">
+                <div className="p-4 border-b flex items-center justify-between gap-4 flex-wrap">
                   <h2 className="text-lg font-semibold flex items-center gap-2">
                     <FileText className="w-5 h-5" />
-                    Notes & Communication ({notes.length})
-                    {selectedAuthorId && noteAuthors.length > 0 && (
+                    Notes & Communication ({noteFilterMemberId === 'all' ? notes.length : notes.filter((n) => n.staff_id === noteFilterMemberId).length})
+                    {selectedAuthorId && teamMembers.length > 0 && (
                       <span className="ml-2 text-xs px-2 py-0.5 rounded-full bg-primary/10 text-primary font-medium">
-                        {noteAuthors.find((a) => a.id === selectedAuthorId)?.name}
+                        {teamMembers.find((a) => a.id === selectedAuthorId)?.name}
                       </span>
                     )}
                   </h2>
+                  {teamMembers.length > 0 && (
+                    <Select value={noteFilterMemberId} onValueChange={(v) => setNoteFilterMemberId(v as typeof noteFilterMemberId)}>
+                      <SelectTrigger className="w-[170px] h-8 text-xs" aria-label="Filter notes by member">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">All members</SelectItem>
+                        {teamMembers.map((m) => (
+                          <SelectItem key={m.id} value={m.id}>{m.name}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  )}
                 </div>
                 <div className="p-4 border-b bg-muted/20">
                   <div className="flex gap-2">
@@ -668,13 +698,13 @@ export default function Client360Page() {
                         ))}
                       </SelectContent>
                     </Select>
-                    {noteAuthors.length > 0 && (
+                    {teamMembers.length > 0 && (
                       <Select value={selectedAuthorId ?? ''} onValueChange={(v) => setSelectedAuthorId(v || null)}>
                         <SelectTrigger className="w-[160px]" aria-label="Note author">
-                          <SelectValue placeholder={selectedAuthorId ? noteAuthors.find(a => a.id === selectedAuthorId)?.name || 'Your name' : 'Your name'} />
+                          <SelectValue placeholder={selectedAuthorId ? teamMembers.find(a => a.id === selectedAuthorId)?.name || 'Your name' : 'Your name'} />
                         </SelectTrigger>
                         <SelectContent>
-                          {noteAuthors.map((a) => (
+                          {teamMembers.map((a) => (
                             <SelectItem key={a.id} value={a.id}>{a.name}</SelectItem>
                           ))}
                         </SelectContent>
@@ -699,10 +729,10 @@ export default function Client360Page() {
                       No notes yet. Log the first contact above — every touch counts toward this case&apos;s health.
                     </div>
                   ) : (
-                    notes.map((note) => {
+                    notes.filter((n) => noteFilterMemberId === 'all' || n.staff_id === noteFilterMemberId).map((note) => {
                       const meta = CHANNEL_META[note.channel]
                       const isEditing = editingNoteId === note.id
-                      const authorName = note.note_authors?.name
+                      const authorName = note.team_members?.name
                       const initials = authorName
                         ? authorName.split(' ').map((n) => n[0]).join('').toUpperCase().slice(0, 2)
                         : ''
@@ -818,7 +848,7 @@ export default function Client360Page() {
               >
                 <h2 className="text-lg font-semibold mb-4">Activity Timeline</h2>
                 <ActivityTimeline items={[
-                  ...notes.map(n => ({ id: n.id, type: 'note' as const, title: n.note_authors?.name ? `Note by ${n.note_authors.name}` : 'Note', description: n.content, date: n.created_at })),
+                  ...notes.map(n => ({ id: n.id, type: 'note' as const, title: n.team_members?.name ? `Note by ${n.team_members.name}` : 'Note', description: n.content, date: n.created_at })),
                   ...tasks.map(t => ({ id: t.id, type: 'task' as const, title: t.title, description: t.completed_at ? 'Completed' : t.due_date ? `Due ${new Date(t.due_date).toLocaleDateString()}` : undefined, date: t.created_at })),
                   ...properties.map(p => ({ id: p.id, type: 'property' as const, title: `Property: ${p.resort_name}`, description: p.status === 'paid_off' ? 'Paid off' : undefined, date: p.created_at })),
                 ]} />
@@ -860,6 +890,18 @@ export default function Client360Page() {
                       aria-label="New task due date"
                       className="flex-1"
                     />
+                    {teamMembers.length > 0 && (
+                      <Select value={taskAssigneeId ?? ''} onValueChange={(v) => setTaskAssigneeId(v || null)}>
+                        <SelectTrigger className="w-[150px]" aria-label="Assign task to">
+                          <SelectValue placeholder="Unassigned" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {teamMembers.map((m) => (
+                            <SelectItem key={m.id} value={m.id}>{m.name}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    )}
                     <Button onClick={submitTask} disabled={taskSaving || !taskTitle.trim() || !taskDue}>
                       <Plus className="w-4 h-4 mr-1" />
                       Add
@@ -875,6 +917,10 @@ export default function Client360Page() {
                   ) : (
                     tasks.map((task) => {
                       const status = taskStatus(task)
+                      const assignee = task.team_members?.name
+                      const assigneeInitials = assignee
+                        ? assignee.split(' ').map((n) => n[0]).join('').toUpperCase().slice(0, 2)
+                        : ''
                       return (
                         <div key={task.id} className={cn('p-3 hover:bg-muted/30 transition-colors group', status === 'completed' && 'opacity-60')}>
                           <div className="flex items-start gap-2.5">
@@ -891,6 +937,17 @@ export default function Client360Page() {
                               <div className="flex items-center gap-2 flex-wrap">
                                 <span className={cn('font-medium text-sm', status === 'completed' && 'line-through')}>{task.title}</span>
                                 <TaskStatusBadge status={status} dueSoon={isDueSoon(task)} />
+                                {assignee && (
+                                  <span
+                                    className="inline-flex items-center gap-1 text-xs text-muted-foreground"
+                                    title={`Assigned to ${assignee}`}
+                                  >
+                                    <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-primary/10 text-primary text-[10px] font-semibold">
+                                      {assigneeInitials}
+                                    </span>
+                                    {assignee}
+                                  </span>
+                                )}
                               </div>
                               <div className="flex items-center gap-2 text-xs text-muted-foreground mt-0.5">
                                 <span className={cn('flex items-center gap-1 font-mono', status === 'overdue' && 'text-red-600 font-medium')}>

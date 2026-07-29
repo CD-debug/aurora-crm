@@ -9,7 +9,7 @@ export const queryKeys = {
   tasks: {
     all: ['tasks'] as const,
   },
-  noteAuthors: {
-    all: ['noteAuthors'] as const,
+  teamMembers: {
+    all: ['teamMembers'] as const,
   },
 } as const
