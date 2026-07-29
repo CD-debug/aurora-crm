@@ -6,7 +6,7 @@
 // fetches the whole workspace; every mutation invalidates the shared keys
 // so the Tasks page and directory stay in sync (PRD §7.4).
 
-import { useMemo, useState } from 'react'
+import { useMemo, useState, useEffect } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { format, parseISO } from 'date-fns'
@@ -16,7 +16,7 @@ import { ActivityTimeline } from '@/components/shared/ActivityTimeline'
 import {
   Calendar, Clock, DollarSign, Home, AlertTriangle, CheckCircle, Plus, Trash2,
   Mail, Phone, MessageSquare, FileText, Building2, Target, TrendingUp, Pencil,
-  CalendarClock, FileWarning, Percent, CalendarDays, Shield, MapPin,
+  CalendarClock, FileWarning, Percent, CalendarDays, Shield, MapPin, UserCircle, Pin, Save, X,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -27,16 +27,16 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription, SheetFo
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog'
 import { NavRail, Breadcrumb, AuroraArcStepper, ClientHealthBadge, StageBadge, TaskStatusBadge, CurrencyInput, YesNoToggle, ConditionalField, PhoneInput, SsnInput } from '@/components/shared'
 import { createClient } from '@/lib/supabase/client'
-import { fetchClient360, invalidateAfterMutation } from '@/lib/data/client-queries'
+import { fetchClient360, fetchNoteAuthors, invalidateAfterMutation } from '@/lib/data/client-queries'
 import { queryKeys } from '@/lib/data/query-keys'
 import {
-  createNote, deleteNote, createProperty, updateProperty, setPropertyPaidOff, deleteProperty,
+  createNote, deleteNote, updateNote, toggleNotePin, createProperty, updateProperty, setPropertyPaidOff, deleteProperty,
   createTask, setTaskCompleted, deleteTask, updateClientStage, updateClient,
 } from '@/lib/data/mutations'
 import {
   daysSince, financialProgress, isDueSoon, stagePercent, taskStatus, STAGE_LABELS,
 } from '@/lib/data/domain'
-import type { NoteChannel, PipelineStage, Property } from '@/lib/data/types'
+import type { NoteChannel, PipelineStage, Property, NoteAuthor } from '@/lib/data/types'
 import { cn } from '@/lib/utils'
 
 const CHANNEL_META: Record<NoteChannel, { label: string; icon: typeof Mail }> = {
@@ -87,15 +87,25 @@ export default function Client360Page() {
   }
 
   // --- Notes (inline quick-add, PRD §11.3) -----------------------------------
+  const { data: noteAuthors = [] } = useQuery({
+    queryKey: queryKeys.noteAuthors.all,
+    queryFn: () => fetchNoteAuthors(supabase),
+  })
   const [noteChannel, setNoteChannel] = useState<NoteChannel>('phone')
   const [noteContent, setNoteContent] = useState('')
   const [noteSaving, setNoteSaving] = useState(false)
+  const [selectedAuthorId, setSelectedAuthorId] = useState<string | null>(() => {
+    if (typeof window !== 'undefined') return localStorage.getItem('aurora-note-author')
+    return null
+  })
+  const [editingNoteId, setEditingNoteId] = useState<string | null>(null)
+  const [editingContent, setEditingContent] = useState('')
 
   const submitNote = async () => {
     if (!noteContent.trim() || noteSaving) return
     setNoteSaving(true)
     try {
-      await createNote({ client_id: clientId, channel: noteChannel, content: noteContent.trim() })
+      await createNote({ client_id: clientId, channel: noteChannel, content: noteContent.trim(), staff_id: selectedAuthorId })
       await invalidateAfterMutation(queryClient, clientId)
       setNoteContent('')
       toast.success('Note saved')
@@ -106,6 +116,11 @@ export default function Client360Page() {
     }
   }
 
+  useEffect(() => {
+    if (selectedAuthorId) localStorage.setItem('aurora-note-author', selectedAuthorId)
+    else localStorage.removeItem('aurora-note-author')
+  }, [selectedAuthorId])
+
   const handleDeleteNote = async (noteId: string) => {
     try {
       await deleteNote(noteId, clientId)
@@ -113,6 +128,27 @@ export default function Client360Page() {
       toast.success('Note deleted')
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Couldn't delete this note.")
+    }
+  }
+
+  const handleUpdateNote = async (noteId: string, content: string) => {
+    try {
+      await updateNote(noteId, clientId, content)
+      await invalidateAfterMutation(queryClient, clientId)
+      setEditingNoteId(null)
+      toast.success('Note updated')
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Couldn't update this note.")
+    }
+  }
+
+  const handleTogglePin = async (noteId: string, pinned: boolean) => {
+    try {
+      await toggleNotePin(noteId, clientId, pinned)
+      await invalidateAfterMutation(queryClient, clientId)
+      toast.success(pinned ? 'Note pinned' : 'Note unpinned')
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Couldn't update pin.")
     }
   }
 
@@ -627,6 +663,18 @@ export default function Client360Page() {
                         ))}
                       </SelectContent>
                     </Select>
+                    {noteAuthors.length > 0 && (
+                      <Select value={selectedAuthorId ?? ''} onValueChange={(v) => setSelectedAuthorId(v || null)}>
+                        <SelectTrigger className="w-[160px]" aria-label="Note author">
+                          <SelectValue placeholder="Your name" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {noteAuthors.map((a) => (
+                            <SelectItem key={a.id} value={a.id}>{a.name}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    )}
                     <Textarea
                       value={noteContent}
                       onChange={(e) => setNoteContent(e.target.value)}
@@ -648,28 +696,98 @@ export default function Client360Page() {
                   ) : (
                     notes.map((note) => {
                       const meta = CHANNEL_META[note.channel]
+                      const isEditing = editingNoteId === note.id
+                      const authorName = note.note_authors?.name
+                      const initials = authorName
+                        ? authorName.split(' ').map((n) => n[0]).join('').toUpperCase().slice(0, 2)
+                        : ''
                       return (
-                        <div key={note.id} className="p-4 hover:bg-muted/30 transition-colors group">
+                        <div
+                          key={note.id}
+                          className={cn('p-4 hover:bg-muted/30 transition-colors group', note.pinned && 'bg-primary/5 border-l-2 border-primary')}
+                        >
                           <div className="flex items-start gap-3">
-                            <div className="flex-shrink-0 w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
-                              <meta.icon className="w-4 h-4 text-primary" />
+                            <div className="flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center"
+                              style={authorName ? { background: 'hsl(var(--primary) / 0.1)' } : { background: 'hsl(var(--primary) / 0.1)' }}>
+                              {authorName ? (
+                                <span className="text-xs font-semibold text-primary">{initials}</span>
+                              ) : (
+                                <meta.icon className="w-4 h-4 text-primary" />
+                              )}
                             </div>
                             <div className="flex-1 min-w-0">
                               <div className="flex items-center gap-2 mb-1">
+                                {authorName && (
+                                  <span className="text-xs font-medium text-primary flex items-center gap-1">
+                                    <UserCircle className="w-3 h-3" />
+                                    {authorName}
+                                  </span>
+                                )}
                                 <Badge variant="outline" className="text-xs">{meta.label}</Badge>
+                                {note.pinned && (
+                                    <span title="Pinned" className="flex items-center">
+                                      <Pin className="w-3 h-3 text-primary" />
+                                    </span>
+                                  )}
+                                {note.updated_at && (
+                                  <span className="text-xs text-muted-foreground font-mono" title="Edited">
+                                    <span className="flex items-center gap-0.5">
+                                      <Pencil className="w-3 h-3" />
+                                      edited
+                                    </span>
+                                  </span>
+                                )}
                                 <span className="text-xs text-muted-foreground font-mono">
                                   {format(new Date(note.created_at), 'MMM d, yyyy h:mm a')}
                                 </span>
-                                <button
-                                  onClick={() => setDeleteTarget({ kind: 'note', id: note.id, label: note.content.slice(0, 60) })}
-                                  className="ml-auto opacity-70 md:opacity-0 md:group-hover:opacity-100 text-muted-foreground hover:text-red-600 transition-all"
-                                  aria-label="Delete note"
-                                  title="Delete note"
-                                >
-                                  <Trash2 className="w-3.5 h-3.5" />
-                                </button>
+                                <div className="ml-auto flex items-center gap-1 opacity-70 md:opacity-0 md:group-hover:opacity-100 transition-all">
+                                  <button
+                                    onClick={() => { setEditingContent(note.content); setEditingNoteId(note.id); }}
+                                    className="p-1.5 rounded text-muted-foreground hover:text-primary hover:bg-primary/10 transition-colors"
+                                    aria-label="Edit note"
+                                    title="Edit note"
+                                  >
+                                    <Pencil className="w-3.5 h-3.5" />
+                                  </button>
+                                  <button
+                                    onClick={() => handleTogglePin(note.id, !note.pinned)}
+                                    className={cn('p-1.5 rounded text-muted-foreground hover:bg-surface-warning/20 transition-colors', note.pinned && 'text-yellow-600')}
+                                    aria-label={note.pinned ? 'Unpin note' : 'Pin note'}
+                                    title={note.pinned ? 'Unpin note' : 'Pin note'}
+                                  >
+                                    <Pin className={cn('w-3.5 h-3.5', note.pinned && 'fill-current')} />
+                                  </button>
+                                  <button
+                                    onClick={() => setDeleteTarget({ kind: 'note', id: note.id, label: note.content.slice(0, 60) })}
+                                    className="p-1.5 rounded text-muted-foreground hover:text-red-600 hover:bg-red-50 transition-colors"
+                                    aria-label="Delete note"
+                                    title="Delete note"
+                                  >
+                                    <Trash2 className="w-3.5 h-3.5" />
+                                  </button>
+                                </div>
                               </div>
-                              <p className="text-sm whitespace-pre-wrap">{note.content}</p>
+                              {isEditing ? (
+                                <div className="flex gap-2 mt-2">
+                                  <Textarea
+                                    value={editingContent}
+                                    onChange={(e) => setEditingContent(e.target.value)}
+                                    onKeyDown={(e) => {
+                                      if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') handleUpdateNote(note.id, editingContent)
+                                      if (e.key === 'Escape') setEditingNoteId(null)
+                                    }}
+                                    rows={3}
+                                    className="flex-1"
+                                    autoFocus
+                                  />
+                                  <div className="flex flex-col gap-1 self-end">
+                                    <Button size="sm" onClick={() => handleUpdateNote(note.id, editingContent)}><Save className="w-4 h-4" /></Button>
+                                    <Button size="sm" variant="ghost" onClick={() => setEditingNoteId(null)}><X className="w-4 h-4" /></Button>
+                                  </div>
+                                </div>
+                              ) : (
+                                <p className="text-sm whitespace-pre-wrap">{note.content}</p>
+                              )}
                             </div>
                           </div>
                         </div>
