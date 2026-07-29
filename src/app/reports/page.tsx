@@ -60,6 +60,53 @@ export default async function ReportsPage() {
               <span className="font-mono tabular-nums font-medium">${data.totalLoanBalance.toLocaleString()}</span></div>
           </div>
         </Section>
+
+        <Section title="Team Activity">
+          {data.teamActivity.length === 0 ? (
+            <p className="text-sm text-muted-foreground py-2">
+              No team members yet. Add names in <span className="font-medium">Settings → Team Members</span> to see per-member activity here.
+            </p>
+          ) : (
+            <div className="space-y-3">
+              {data.teamActivity.map((m) => (
+                <div key={m.id} className="space-y-1.5">
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="font-medium">{m.name}</span>
+                    <span className="text-xs text-muted-foreground font-mono tabular-nums">
+                      {m.notes} note{m.notes !== 1 ? 's' : ''} · {m.tasksCompleted}/{m.tasksTotal} task{m.tasksTotal !== 1 ? 's' : ''}
+                    </span>
+                  </div>
+                  <div className="flex gap-1 h-2 rounded-full overflow-hidden bg-muted">
+                    {m.tasksTotal > 0 && (
+                      <div
+                        className="h-full bg-primary"
+                        style={{ width: `${(m.tasksCompleted / Math.max(m.tasksCompleted + (m.tasksTotal - m.tasksCompleted) + m.notes, 1)) * 100}%` }}
+                        title={`${m.tasksCompleted} tasks completed`}
+                      />
+                    )}
+                    {m.notes > 0 && (
+                      <div
+                        className="h-full bg-chart-2"
+                        style={{ width: `${(m.notes / Math.max(m.tasksTotal + m.notes, 1)) * 100}%` }}
+                        title={`${m.notes} notes`}
+                      />
+                    )}
+                  </div>
+                </div>
+              ))}
+              {(data.unassignedActivity.notes > 0 || data.unassignedActivity.tasksTotal > 0) && (
+                <div className="space-y-1.5 pt-2 border-t">
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="text-muted-foreground italic">Unassigned</span>
+                    <span className="text-xs text-muted-foreground font-mono tabular-nums">
+                      {data.unassignedActivity.notes} note{data.unassignedActivity.notes !== 1 ? 's' : ''} · {data.unassignedActivity.tasksCompleted}/{data.unassignedActivity.tasksTotal} task{data.unassignedActivity.tasksTotal !== 1 ? 's' : ''}
+                    </span>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+        </Section>
         </div>
         </div>
       </main>

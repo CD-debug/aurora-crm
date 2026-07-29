@@ -11,7 +11,7 @@ import { z } from 'zod'
 import { createServerClient } from '@/lib/supabase/server'
 import { findDuplicates } from './domain'
 import { clientInput } from './schemas'
-import type { Client, Note, NoteAuthor, PipelineStage, Property, Task } from './types'
+import type { Client, Note, TeamMember, PipelineStage, Property, Task } from './types'
 
 export async function requireUser() {
   const supabase = await createServerClient()
@@ -213,7 +213,7 @@ export async function createNote(input: z.input<typeof noteInput>) {
   const { data: note, error } = await supabase
     .from('notes')
     .insert({ ...data, author_id: userId, staff_id: data.staff_id ?? null })
-    .select('*, note_authors(name)')
+    .select('*, team_members(name)')
     .single()
   if (error) fail(error)
   revalidate(data.client_id)
@@ -248,38 +248,39 @@ export async function deleteNote(noteId: string, clientId: string) {
 }
 
 // ---------------------------------------------------------------------------
-// Note Authors — named people for attribution (single-login env)
+// Team Members — named people for attribution across notes, tasks, etc.
+// (single-login env — these are display names, not auth accounts)
 // ---------------------------------------------------------------------------
 
-const authorInput = z.object({
+const memberInput = z.object({
   name: z.string().trim().min(1, 'Name is required').max(80),
 })
 
-export async function listNoteAuthors(): Promise<NoteAuthor[]> {
+export async function listTeamMembers(): Promise<TeamMember[]> {
   const { supabase } = await requireUser()
   const { data, error } = await supabase
-    .from('note_authors')
+    .from('team_members')
     .select('*')
     .order('name', { ascending: true })
   if (error) fail(error)
-  return data as NoteAuthor[]
+  return data as TeamMember[]
 }
 
-export async function createNoteAuthor(name: string): Promise<NoteAuthor> {
+export async function createTeamMember(name: string): Promise<TeamMember> {
   const { supabase, userId } = await requireUser()
-  const data = authorInput.parse({ name })
-  const { data: author, error } = await supabase
-    .from('note_authors')
+  const data = memberInput.parse({ name })
+  const { data: member, error } = await supabase
+    .from('team_members')
     .insert({ ...data, owner_id: userId })
     .select()
     .single()
   if (error) fail(error)
-  return author as NoteAuthor
+  return member as TeamMember
 }
 
-export async function deleteNoteAuthor(id: string): Promise<void> {
+export async function deleteTeamMember(id: string): Promise<void> {
   const { supabase } = await requireUser()
-  const { error } = await supabase.from('note_authors').delete().eq('id', id)
+  const { error } = await supabase.from('team_members').delete().eq('id', id)
   if (error) fail(error)
 }
 
@@ -293,6 +294,7 @@ const taskInput = z.object({
   description: z.string().trim().max(2000).nullable().optional(),
   due_date: z.iso.date('Pick a due date'),
   due_time: z.iso.time().nullable().optional(),
+  staff_id: z.string().uuid().nullable().optional(),
 })
 
 export async function createTask(input: z.input<typeof taskInput>) {
@@ -305,6 +307,7 @@ export async function createTask(input: z.input<typeof taskInput>) {
       ...data,
       description: data.description || null,
       due_time: data.due_time || null,
+      staff_id: data.staff_id ?? null,
       author_id: userId,
     })
     .select()

@@ -8,7 +8,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type { QueryClient } from '@tanstack/react-query'
 import { queryKeys } from './query-keys'
-import type { Client360, ClientWithHealth, Note, NoteAuthor, Property, Task, TaskWithClient } from './types'
+import type { Client360, ClientWithHealth, Note, Property, Task, TaskWithClient, TeamMember } from './types'
 
 /**
  * Call after any successful server action: refreshes every client-side view
@@ -16,7 +16,11 @@ import type { Client360, ClientWithHealth, Note, NoteAuthor, Property, Task, Tas
  * are covered by the action's own revalidatePath.
  */
 export function invalidateAfterMutation(queryClient: QueryClient, clientId?: string) {
-  const keys: Array<readonly unknown[]> = [queryKeys.clients.all, queryKeys.tasks.all]
+  const keys: Array<readonly unknown[]> = [
+    queryKeys.clients.all,
+    queryKeys.tasks.all,
+    queryKeys.teamMembers.all,
+  ]
   if (clientId) keys.push(queryKeys.clients.detail(clientId))
   return Promise.all(keys.map((queryKey) => queryClient.invalidateQueries({ queryKey })))
 }
@@ -50,8 +54,8 @@ export async function fetchClient360(supabase: SupabaseClient, clientId: string)
   const [clientRes, propsRes, notesRes, tasksRes] = await Promise.all([
     supabase.from('clients_with_health').select('*').eq('id', clientId).single(),
     supabase.from('properties').select('*').eq('client_id', clientId).order('created_at', { ascending: true }),
-    supabase.from('notes').select('*, note_authors(name)').eq('client_id', clientId).order('pinned', { ascending: false }).order('created_at', { ascending: false }),
-    supabase.from('tasks').select('*').eq('client_id', clientId).order('due_date', { ascending: true }),
+    supabase.from('notes').select('*, team_members(name)').eq('client_id', clientId).order('pinned', { ascending: false }).order('created_at', { ascending: false }),
+    supabase.from('tasks').select('*, team_members(name)').eq('client_id', clientId).order('due_date', { ascending: true }),
   ])
   if (clientRes.error) throw new Error(`Couldn't load this client: ${clientRes.error.message}`)
   if (propsRes.error) throw new Error(`Couldn't load properties: ${propsRes.error.message}`)
@@ -65,19 +69,19 @@ export async function fetchClient360(supabase: SupabaseClient, clientId: string)
   }
 }
 
-export async function fetchNoteAuthors(supabase: SupabaseClient): Promise<NoteAuthor[]> {
+export async function fetchTeamMembers(supabase: SupabaseClient): Promise<TeamMember[]> {
   const { data, error } = await supabase
-    .from('note_authors')
+    .from('team_members')
     .select('*')
     .order('created_at', { ascending: true })
-  if (error) throw new Error(`Couldn't load note authors: ${error.message}`)
-  return data as NoteAuthor[]
+  if (error) throw new Error(`Couldn't load team members: ${error.message}`)
+  return data as TeamMember[]
 }
 
 export async function fetchTasks(supabase: SupabaseClient): Promise<TaskWithClient[]> {
   const { data, error } = await supabase
     .from('tasks')
-    .select('*, clients(name, state)')
+    .select('*, clients(name, state), team_members(name)')
     .order('due_date', { ascending: true })
   if (error) throw new Error(`Couldn't load tasks: ${error.message}`)
   return data as TaskWithClient[]

@@ -15,7 +15,7 @@ import { Calendar } from '@/components/ui/calendar'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { NavRail, ClientCombobox } from '@/components/shared'
 import { createClient } from '@/lib/supabase/client'
-import { fetchClients, fetchTasks, invalidateAfterMutation } from '@/lib/data/client-queries'
+import { fetchClients, fetchTasks, fetchTeamMembers, invalidateAfterMutation } from '@/lib/data/client-queries'
 import { queryKeys } from '@/lib/data/query-keys'
 import { createTask, setTaskCompleted, updateTask, deleteTask } from '@/lib/data/mutations'
 import { taskStatus } from '@/lib/data/domain'
@@ -35,6 +35,10 @@ function TasksPageContent() {
   const { data: clients = [] } = useQuery({
     queryKey: queryKeys.clients.all,
     queryFn: () => fetchClients(supabase),
+  })
+  const { data: teamMembers = [] } = useQuery({
+    queryKey: queryKeys.teamMembers.all,
+    queryFn: () => fetchTeamMembers(supabase),
   })
 
   const filterClient = searchParams.get('client') ?? ''
@@ -97,7 +101,16 @@ function TasksPageContent() {
 
   const [quickTitle, setQuickTitle] = useState('')
   const [quickClient, setQuickClient] = useState('')
+  const [quickAssigneeId, setQuickAssigneeId] = useState<string | null>(() => {
+    if (typeof window !== 'undefined') return localStorage.getItem('aurora-task-assignee')
+    return null
+  })
   const [saving, setSaving] = useState(false)
+
+  useEffect(() => {
+    if (quickAssigneeId) localStorage.setItem('aurora-task-assignee', quickAssigneeId)
+    else localStorage.removeItem('aurora-task-assignee')
+  }, [quickAssigneeId])
 
   const effectiveClient = filterClient || quickClient || (clients.length === 1 ? clients[0].id : '')
 
@@ -106,7 +119,12 @@ function TasksPageContent() {
     if (!quickTitle.trim() || !effectiveClient || saving) return
     setSaving(true)
     try {
-      await createTask({ client_id: effectiveClient, title: quickTitle.trim(), due_date: dueDate })
+      await createTask({
+        client_id: effectiveClient,
+        title: quickTitle.trim(),
+        due_date: dueDate,
+        staff_id: quickAssigneeId,
+      })
       await invalidateAfterMutation(queryClient, effectiveClient)
       setQuickTitle('')
       toast.success('Task created')
@@ -282,6 +300,16 @@ function TasksPageContent() {
                 className="flex-1 min-w-[200px]"
                 disabled={!effectiveClient}
               />
+              {teamMembers.length > 0 && (
+                <Select value={quickAssigneeId ?? ''} onValueChange={(v) => setQuickAssigneeId(v || null)}>
+                  <SelectTrigger className="w-[150px]" aria-label="Assign to team member"><SelectValue placeholder="Unassigned" /></SelectTrigger>
+                  <SelectContent>
+                    {teamMembers.map((m) => (
+                      <SelectItem key={m.id} value={m.id}>{m.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
               <span className="hidden sm:inline-flex text-xs text-muted-foreground items-center gap-1 whitespace-nowrap">
                 <CalendarIcon className="w-3 h-3" />
                 Due {filterDue ? format(parseISO(filterDue), 'MMM d') : format(today, 'MMM d')}
@@ -351,6 +379,7 @@ function TasksPageContent() {
                     <th className="text-left px-4 py-2.5 font-medium text-muted-foreground w-8" />
                     <th className="text-left px-4 py-2.5 font-medium text-muted-foreground">Task</th>
                     <th className="text-left px-4 py-2.5 font-medium text-muted-foreground hidden sm:table-cell">Client</th>
+                    <th className="text-left px-4 py-2.5 font-medium text-muted-foreground hidden md:table-cell">Assigned</th>
                     <th className="text-right px-4 py-2.5 font-medium text-muted-foreground w-24">Due</th>
                     <th className="w-10" />
                   </tr>
@@ -395,6 +424,21 @@ function TasksPageContent() {
                               {task.clients?.name ?? '—'}
                             </button>
                           </td>
+                          <td className="px-4 py-2.5 hidden md:table-cell">
+                            {task.team_members?.name ? (
+                              <span
+                                className="inline-flex items-center gap-1.5 text-xs"
+                                title={`Assigned to ${task.team_members.name}`}
+                              >
+                                <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-primary/10 text-primary text-[10px] font-semibold">
+                                  {task.team_members.name.split(' ').map((n) => n[0]).join('').toUpperCase().slice(0, 2)}
+                                </span>
+                                <span className="text-muted-foreground">{task.team_members.name}</span>
+                              </span>
+                            ) : (
+                              <span className="text-xs text-muted-foreground/60">—</span>
+                            )}
+                          </td>
                           <td className="px-4 py-2.5 text-right">
                             <span className={cn(
                               'text-xs font-mono tabular-nums',
@@ -418,7 +462,7 @@ function TasksPageContent() {
                         </tr>
                         {expanded && (
                           <tr key={`${task.id}-detail`} className="bg-muted/20">
-                            <td colSpan={5} className="px-6 py-4">
+                            <td colSpan={6} className="px-6 py-4">
                               <div className="flex items-start justify-between gap-4">
                                 <div className="space-y-2 flex-1 min-w-0">
                                   <h3 className="font-semibold">{task.title}</h3>

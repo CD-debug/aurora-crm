@@ -3,10 +3,12 @@ import { createServerClient } from '@/lib/supabase/server'
 export async function getReportData() {
   const supabase = await createServerClient()
 
-  const [{ data: clients }, { data: tasks }, { data: properties }] = await Promise.all([
+  const [{ data: clients }, { data: tasks }, { data: properties }, { data: notes }, { data: teamMembers }] = await Promise.all([
     supabase.from('clients').select('id, stage, health_status, state, created_at'),
-    supabase.from('tasks').select('id, due_date, completed_at, created_at'),
+    supabase.from('tasks').select('id, due_date, completed_at, created_at, staff_id'),
     supabase.from('properties').select('id, status, purchase_price, loan_balance'),
+    supabase.from('notes').select('id, staff_id, created_at'),
+    supabase.from('team_members').select('id, name').order('name', { ascending: true }),
   ])
 
   const totalClients = clients?.length ?? 0
@@ -40,6 +42,40 @@ export async function getReportData() {
   const totalPurchasePrice = properties?.reduce((sum, p) => sum + (p.purchase_price ?? 0), 0) ?? 0
   const totalLoanBalance = properties?.reduce((sum, p) => sum + (p.loan_balance ?? 0), 0) ?? 0
 
+  // Per-team-member activity
+  const memberName = new Map<string, string>()
+  for (const m of teamMembers ?? []) memberName.set(m.id, m.name)
+
+  type ActivityRow = { id: string; name: string; notes: number; tasksTotal: number; tasksCompleted: number; lastActive: string | null }
+  const byMember: ActivityRow[] = []
+  const unassignedActivity: ActivityRow = { id: 'unassigned', name: 'Unassigned', notes: 0, tasksTotal: 0, tasksCompleted: 0, lastActive: null }
+
+  for (const member of teamMembers ?? []) {
+    const mid = member.id
+    const memberNotes = (notes ?? []).filter((n) => n.staff_id === mid)
+    const memberTasks = (tasks ?? []).filter((t) => t.staff_id === mid)
+    const allDates = [
+      ...memberNotes.map((n) => n.created_at),
+      ...memberTasks.map((t) => t.created_at),
+    ].filter(Boolean) as string[]
+    byMember.push({
+      id: mid,
+      name: member.name,
+      notes: memberNotes.length,
+      tasksTotal: memberTasks.length,
+      tasksCompleted: memberTasks.filter((t) => t.completed_at).length,
+      lastActive: allDates.length > 0 ? allDates.sort().reverse()[0] : null,
+    })
+  }
+  // Collect any rows attributed to members that no longer exist
+  const knownIds = new Set((teamMembers ?? []).map((m) => m.id))
+  unassignedActivity.notes = (notes ?? []).filter((n) => !n.staff_id || !knownIds.has(n.staff_id)).length
+  unassignedActivity.tasksTotal = (tasks ?? []).filter((t) => !t.staff_id || !knownIds.has(t.staff_id)).length
+  unassignedActivity.tasksCompleted = (tasks ?? []).filter((t) => (t.completed_at) && (!t.staff_id || !knownIds.has(t.staff_id))).length
+
+  // Sort by activity (notes + tasks) desc
+  byMember.sort((a, b) => (b.notes + b.tasksTotal) - (a.notes + a.tasksTotal))
+
   return {
     totalClients,
     totalTasks,
@@ -52,5 +88,7 @@ export async function getReportData() {
     totalLoanBalance,
     activeProperties: properties?.filter(p => p.status === 'active').length ?? 0,
     paidOffProperties: properties?.filter(p => p.status === 'paid_off').length ?? 0,
+    teamActivity: byMember,
+    unassignedActivity,
   }
 }
