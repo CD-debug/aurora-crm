@@ -8,17 +8,6 @@ import type { DashboardData } from '@/lib/data/types'
 import { STAGE_LABELS } from '@/lib/data/domain'
 import { DollarSign, Users, AlertTriangle, AlertCircle, CheckCircle, Target, TrendingUp, Clock } from 'lucide-react'
 
-function Sparkline({ data: values, color }: { data: number[]; color: string }) {
-  const w = 120, h = 32
-  const max = Math.max(...values, 1)
-  const pts = values.map((v, i) => `${(i / (values.length - 1)) * w},${h - (v / max) * h}`).join(' ')
-  return (
-    <svg width={w} height={h} viewBox={`0 0 ${w} ${h}`} className="flex-shrink-0" aria-hidden="true">
-      <polyline points={pts} fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-    </svg>
-  )
-}
-
 function MetricTileSmall({ icon, title, value, numericValue, href, color }: {
   icon: React.ReactNode
   title: string
@@ -89,10 +78,7 @@ export function DashboardView({ data }: { data: DashboardData }) {
     { stage: 'resolved', label: STAGE_LABELS.resolved, color: 'var(--chart-5)' },
   ].map((s) => ({ ...s, count: data.stage_counts[s.stage as keyof typeof data.stage_counts] ?? 0 }))
 
-  // Synthetic sparkline data — 7 periods trending toward current value
-  const sparkValues = Array.from({ length: 7 }, (_, i) =>
-    Math.round((data.total_debt_eliminated / 7) * (i + 1) * (0.85 + Math.random() * 0.3))
-  )
+  const noData = data.total_cases === 0
 
   return (
     <Stagger className="space-y-6" delay={0.1}>
@@ -104,15 +90,26 @@ export function DashboardView({ data }: { data: DashboardData }) {
             <p className="text-5xl md:text-6xl font-heading font-normal tracking-[-0.02em] text-foreground">
               ${data.total_debt_eliminated.toLocaleString()}
             </p>
-            <div className="flex items-center gap-2 mt-2">
-              <span className="inline-flex items-center gap-1 text-sm font-mono tabular-nums text-emerald-700 bg-[var(--surface-success)] px-2 py-0.5 rounded">
-                + ${Math.round(data.total_debt_eliminated * 0.15).toLocaleString()} this month
-              </span>
-            </div>
+            {data.this_month_debt_eliminated > 0 ? (
+              <div className="flex items-center gap-2 mt-2">
+                <span className="inline-flex items-center gap-1 text-sm font-mono tabular-nums text-emerald-700 bg-[var(--surface-success)] px-2 py-0.5 rounded">
+                  + ${data.this_month_debt_eliminated.toLocaleString()} this month
+                </span>
+              </div>
+            ) : (
+              <p className="text-xs text-muted-foreground mt-2">
+                No properties paid off in the last 30 days yet.
+              </p>
+            )}
           </div>
           <div className="hidden lg:flex flex-col justify-center items-end p-6 rounded-xl border bg-card">
-            <Sparkline data={sparkValues} color="var(--primary)" />
-            <p className="text-xs text-muted-foreground mt-2 font-mono tabular-nums">90-day trend</p>
+            <div className="text-right">
+              <p className="text-xs text-muted-foreground uppercase tracking-wide font-medium">Avg. time to resolution</p>
+              <p className="text-2xl font-heading font-semibold mt-1 tabular-nums">
+                {data.avg_days_to_resolution != null ? `${Math.round(data.avg_days_to_resolution)} days` : '—'}
+              </p>
+              <p className="text-xs text-muted-foreground mt-1">across {data.resolved_cases} resolved case{data.resolved_cases !== 1 ? 's' : ''}</p>
+            </div>
           </div>
         </div>
       </FadeUp>
@@ -147,37 +144,46 @@ export function DashboardView({ data }: { data: DashboardData }) {
             className="lg:col-span-2 p-6 rounded-xl border bg-card"
           >
             <h3 className="text-sm font-semibold text-foreground mb-5 uppercase tracking-wide">Pipeline Distribution</h3>
-            <div className="h-3 rounded-full overflow-hidden flex bg-muted">
-              {stageData.map((s) => {
-                const pct = data.total_cases > 0 ? (s.count / data.total_cases) * 100 : 0
-                return pct > 0 ? (
-                  <motion.div
-                    key={s.stage}
-                    initial={{ scaleX: 0 }}
-                    animate={{ scaleX: 1 }}
-                    transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1], delay: 0.5 }}
-                    className="h-full origin-left"
-                    style={{ width: `${pct}%`, backgroundColor: s.color }}
-                  />
-                ) : null
-              })}
-            </div>
-            <div className="mt-5 grid grid-cols-2 gap-x-6 gap-y-3">
-              {stageData.map((s) => (
-                <Link
-                  key={s.stage}
-                  href={`/clients?stage=${s.stage}`}
-                  className="flex items-center gap-2.5 rounded-md px-2 py-1.5 -mx-2 hover:bg-muted/40 transition-colors group"
-                >
-                  <div className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: s.color }} />
-                  <span className="text-sm font-medium group-hover:text-foreground transition-colors">{s.label}</span>
-                  <span className="ml-auto text-sm font-mono tabular-nums text-muted-foreground">
-                    {data.total_cases > 0 ? `${Math.round((s.count / data.total_cases) * 100)}%` : '0%'}
-                  </span>
-                  <span className="text-sm font-mono tabular-nums w-8 text-right">{s.count}</span>
-                </Link>
-              ))}
-            </div>
+            {noData ? (
+              <div className="text-center py-8">
+                <p className="text-sm text-muted-foreground mb-4">No cases yet — add your first client to see the pipeline.</p>
+                <Link href="/clients" className="text-primary hover:underline text-sm font-medium">Go to Clients →</Link>
+              </div>
+            ) : (
+              <>
+                <div className="h-3 rounded-full overflow-hidden flex bg-muted">
+                  {stageData.map((s) => {
+                    const pct = data.total_cases > 0 ? (s.count / data.total_cases) * 100 : 0
+                    return pct > 0 ? (
+                      <motion.div
+                        key={s.stage}
+                        initial={{ scaleX: 0 }}
+                        animate={{ scaleX: 1 }}
+                        transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1], delay: 0.5 }}
+                        className="h-full origin-left"
+                        style={{ width: `${pct}%`, backgroundColor: s.color }}
+                      />
+                    ) : null
+                  })}
+                </div>
+                <div className="mt-5 grid grid-cols-2 gap-x-6 gap-y-3">
+                  {stageData.map((s) => (
+                    <Link
+                      key={s.stage}
+                      href={`/clients?stage=${s.stage}`}
+                      className="flex items-center gap-2.5 rounded-md px-2 py-1.5 -mx-2 hover:bg-muted/40 transition-colors group"
+                    >
+                      <div className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: s.color }} />
+                      <span className="text-sm font-medium group-hover:text-foreground transition-colors">{s.label}</span>
+                      <span className="ml-auto text-sm font-mono tabular-nums text-muted-foreground">
+                        {data.total_cases > 0 ? `${Math.round((s.count / data.total_cases) * 100)}%` : '0%'}
+                      </span>
+                      <span className="text-sm font-mono tabular-nums w-8 text-right">{s.count}</span>
+                    </Link>
+                  ))}
+                </div>
+              </>
+            )}
           </motion.div>
 
           <motion.div

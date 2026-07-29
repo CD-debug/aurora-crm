@@ -1,6 +1,7 @@
 'use client'
 
 import { Suspense, useEffect, useMemo, useState } from 'react'
+import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { addDays, differenceInCalendarDays, eachDayOfInterval, endOfMonth, format, getDay, isSameDay, parseISO, startOfDay, startOfMonth } from 'date-fns'
@@ -548,9 +549,9 @@ function TasksPageContent() {
                 <>
                   <span className="text-border mx-0.5">·</span>
                   <span>for</span>
-                  <a href={`/clients/${effectiveClient}`} className="text-primary hover:underline">
+                  <Link href={`/clients/${effectiveClient}`} className="text-primary hover:underline">
                     {clients.find((c) => c.id === effectiveClient)?.name ?? 'client'}
-                  </a>
+                  </Link>
                 </>
               )}
             </p>

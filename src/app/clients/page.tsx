@@ -107,7 +107,7 @@ function ClientsPageContent() {
           email: form.email,
           state: form.state,
           zip: form.zip,
-          tags: form.tags ? form.tags.split(',').map((t) => t.trim()).filter(Boolean) : [],
+          tags: form.tags ? form.tags.split(/[,;]/).map((t) => t.trim()).filter(Boolean) : [],
           co_client_name: form.co_client_name.trim() || null,
           dob: form.dob || null,
           ssn_last4: form.ssn_last4 || null,
@@ -396,7 +396,7 @@ function ClientsPageContent() {
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <label className="text-sm font-medium" htmlFor="nc-dob">Date of Birth</label>
-                    <Input id="nc-dob" type="date" value={form.dob} onChange={(e) => setForm({ ...form, dob: e.target.value })} />
+                    <Input id="nc-dob" type="date" max={new Date().toISOString().split('T')[0]} value={form.dob} onChange={(e) => setForm({ ...form, dob: e.target.value })} />
                   </div>
                   <div className="space-y-2">
                     <label className="text-sm font-medium" htmlFor="nc-ssn">Last 4 of SSN</label>

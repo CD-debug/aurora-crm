@@ -120,6 +120,7 @@ export interface DashboardData {
   stalled_cases: number
   resolved_cases: number
   total_debt_eliminated: number
+  this_month_debt_eliminated: number
   properties_under_mgmt: number
   avg_days_to_resolution: number | null
   resolution_rate: number
