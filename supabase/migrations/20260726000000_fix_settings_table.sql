@@ -22,9 +22,12 @@ begin
       updated_at timestamptz not null default now()
     );
   else
-    -- Add owner_id if missing
+    -- Add owner_id if missing — auth.uid() returns null during migration,
+    -- so add as nullable, backfill with the first real user, then set not null.
     if not exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'settings' and column_name = 'owner_id') then
-      alter table public.settings add column owner_id uuid not null default auth.uid();
+      alter table public.settings add column owner_id uuid default auth.uid();
+      update public.settings set owner_id = (select id from auth.users order by created_at limit 1) where owner_id is null;
+      alter table public.settings alter column owner_id set not null;
     end if;
   end if;
 
