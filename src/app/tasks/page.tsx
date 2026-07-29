@@ -3,16 +3,15 @@
 import { Suspense, useEffect, useMemo, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { addDays, differenceInCalendarDays, format, isSameDay, parseISO, startOfDay } from 'date-fns'
+import { addDays, differenceInCalendarDays, eachDayOfInterval, endOfMonth, format, getDay, isSameDay, parseISO, startOfDay, startOfMonth } from 'date-fns'
 import { toast } from 'sonner'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
-  Calendar as CalendarIcon, CheckCircle, ChevronDown,
+  Calendar as CalendarIcon, CheckCircle, ChevronDown, ChevronLeft, ChevronRight,
   ExternalLink, Flame, Plus, Sun, Trash2, User, X,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { Calendar } from '@/components/ui/calendar'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { NavRail, ClientCombobox } from '@/components/shared'
 import { createClient } from '@/lib/supabase/client'
@@ -124,6 +123,20 @@ function TasksPageContent() {
       daysWithOverdue: [...withOverdue].map((d) => parseISO(d)),
     }
   }, [tasks, today])
+
+  const [calMonth, setCalMonth] = useState(() => startOfMonth(new Date()))
+
+  const calGrid = useMemo<(Date | null)[]>(() => {
+    const first = startOfMonth(calMonth)
+    const last = endOfMonth(calMonth)
+    const allDays = eachDayOfInterval({ start: first, end: last })
+    const leadBlanks = getDay(first) // 0=Sun
+    const cells: (Date | null)[] = []
+    for (let i = 0; i < leadBlanks; i++) cells.push(null)
+    cells.push(...allDays)
+    while (cells.length % 7 !== 0) cells.push(null)
+    return cells
+  }, [calMonth])
 
   const selectedTask = tasks.find((t) => t.id === selectedId) ?? null
 
@@ -642,35 +655,78 @@ function TasksPageContent() {
               )}
             </motion.div>
 
-            {/* Right rail: calendar (toggle hides it below lg) */}
-            <div className={cn('lg:sticky lg:top-6 space-y-3', !showCalendar && 'hidden lg:block')}>
-              <div className="p-4 rounded-2xl border border-border/60 bg-card shadow-sm">
-                <div className="flex items-center justify-between mb-2">
-                  <h3 className="font-heading text-sm font-semibold tracking-tight">Calendar</h3>
-                  {filterDue && (
+            {/* Right rail: frameless task heatmap (custom, no white box) */}
+            <div className={cn('lg:sticky lg:top-6 space-y-6', !showCalendar && 'hidden lg:block')}>
+              <div>
+                <div className="flex items-center justify-between mb-3">
+                  <h3 className="font-heading text-sm font-semibold tracking-tight">
+                    {format(calMonth, 'MMMM yyyy')}
+                  </h3>
+                  <div className="flex items-center gap-1">
                     <button
-                      onClick={() => setParams({ due: null })}
-                      className="text-xs text-muted-foreground hover:text-foreground"
-                      aria-label="Clear date"
+                      onClick={() => setCalMonth((m) => addDays(startOfMonth(m), -1))}
+                      className="p-1 rounded text-muted-foreground hover:text-foreground hover:bg-muted/60 transition-colors"
+                      aria-label="Previous month"
                     >
-                      Reset
+                      <ChevronLeft className="w-3.5 h-3.5" />
                     </button>
-                  )}
+                    <button
+                      onClick={() => setCalMonth(startOfMonth(new Date()))}
+                      className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground hover:text-foreground px-2 py-1 rounded transition-colors"
+                    >
+                      Today
+                    </button>
+                    <button
+                      onClick={() => setCalMonth((m) => addDays(endOfMonth(m), 1))}
+                      className="p-1 rounded text-muted-foreground hover:text-foreground hover:bg-muted/60 transition-colors"
+                      aria-label="Next month"
+                    >
+                      <ChevronRight className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
                 </div>
-                <div className="-mx-2">
-                  <Calendar
-                    mode="single"
-                    selected={filterDue ? parseISO(filterDue) : undefined}
-                    onSelect={(day) => setParams({ due: day ? format(day, 'yyyy-MM-dd') : null })}
-                    modifiers={{ hasTasks: daysWithTasks, hasOverdue: daysWithOverdue }}
-                    modifiersClassNames={{
-                      hasTasks: 'rdp-day_hasTasks',
-                      hasOverdue: 'rdp-day_overdue',
-                    }}
-                    className="[--cell-size:--spacing(6)] text-xs"
-                  />
+                <div className="grid grid-cols-7 gap-y-1 text-[10px] text-muted-foreground/60 font-medium uppercase tracking-wider mb-2">
+                  {['S','M','T','W','T','F','S'].map((d, i) => (
+                    <div key={i} className="text-center">{d}</div>
+                  ))}
                 </div>
-                <div className="flex items-center gap-4 pt-3 mt-2 border-t border-border/50 text-xs text-muted-foreground">
+                <div className="grid grid-cols-7 gap-1">
+                  {calGrid.map((day, idx) => {
+                    if (!day) return <div key={idx} />
+                    const isToday = isSameDay(day, today)
+                    const isSelected = filterDue && isSameDay(day, parseISO(filterDue))
+                    const hasTasks = daysWithTasks.some((d) => isSameDay(d, day))
+                    const hasOverdue = daysWithOverdue.some((d) => isSameDay(d, day))
+                    return (
+                      <button
+                        key={day.toISOString()}
+                        onClick={() => setParams({ due: isSelected ? null : format(day, 'yyyy-MM-dd') })}
+                        title={format(day, 'MMM d, yyyy')}
+                        className={cn(
+                          'group relative aspect-square flex flex-col items-center justify-center rounded-md transition-all',
+                          'hover:bg-muted/70',
+                          isSelected && 'bg-primary text-primary-foreground hover:bg-primary',
+                          !isSelected && isToday && 'ring-1 ring-primary/60 ring-inset',
+                        )}
+                      >
+                        <span className={cn(
+                          'text-xs leading-none',
+                          !isSelected && isToday && 'font-semibold text-primary',
+                          !isSelected && !isToday && 'text-foreground/80',
+                        )}>
+                          {format(day, 'd')}
+                        </span>
+                        {(hasTasks || hasOverdue) && (
+                          <span className={cn(
+                            'mt-0.5 w-1 h-1 rounded-full',
+                            isSelected ? 'bg-primary-foreground' : hasOverdue ? 'bg-red-500' : 'bg-primary',
+                          )} />
+                        )}
+                      </button>
+                    )
+                  })}
+                </div>
+                <div className="flex items-center gap-4 pt-3 mt-3 text-[11px] text-muted-foreground/80">
                   <span className="flex items-center gap-1.5"><span className="w-1.5 h-1.5 rounded-full bg-primary inline-block" /> tasks due</span>
                   <span className="flex items-center gap-1.5"><span className="w-1.5 h-1.5 rounded-full bg-red-500 inline-block" /> overdue</span>
                 </div>
