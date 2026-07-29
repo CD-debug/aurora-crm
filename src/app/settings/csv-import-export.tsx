@@ -35,10 +35,6 @@ const FIELD_DESCRIPTIONS: Record<string, { required: boolean; description: strin
   document_reference: { required: false, description: 'Document or contract reference number' },
 }
 
-const SAMPLE_CSV = `name,phone,email,state,zip,stage,resort_name,resort_location,unit_number,purchase_price,loan_balance
-John Smith,(555) 123-4567,john@example.com,FL,32801,consultation,Paradise Resort,Orlando FL,Unit 4B,45000,32000
-Jane Doe,(555) 987-6543,jane@example.com,TX,77001,exit_plan,Sunset Villas,Houston TX,Unit 12A,62000,48000`
-
 export function CsvImportExport() {
   const [importing, setImporting] = useState(false)
   const [exporting, setExporting] = useState(false)
@@ -88,7 +84,7 @@ export function CsvImportExport() {
   }, [])
 
   const downloadTemplate = useCallback(() => {
-    const csv = [CSV_TEMPLATE_HEADERS.join(','), SAMPLE_CSV.split('\n')[1]].join('\n')
+    const csv = CSV_TEMPLATE_HEADERS.join(',')
     const blob = new Blob([csv], { type: 'text/csv' })
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
