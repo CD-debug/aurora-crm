@@ -3,42 +3,57 @@
 import { useState, useRef, useCallback } from 'react'
 import { exportClientsCsv, importClientsFromCsv } from '@/lib/data/settings-actions'
 import { toast } from 'sonner'
-import { Download, Upload, FileText, Loader2, CheckCircle, XCircle } from 'lucide-react'
+import { Download, Upload, FileText, Loader2, CheckCircle, XCircle, AlertTriangle } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 
 const CSV_TEMPLATE_HEADERS = [
   'name','phone','email','state','zip',
   'stage','case_opened_at','tags',
+  'co_client_name','dob','ssn_last4','address','phone2','retainer_fee',
   'resort_name','resort_location','unit_number',
   'purchase_price','loan_balance','maintenance_fee',
   'fee_due_date','document_reference',
+  'usage_frequency','usage_type','fees_current','fees_behind_amount','maintenance_fees_billed',
 ]
-
-const REQUIRED_FIELDS = ['name', 'phone', 'email', 'state', 'zip']
 
 const FIELD_DESCRIPTIONS: Record<string, { required: boolean; description: string }> = {
   name: { required: true, description: 'Client full name' },
-  phone: { required: true, description: 'Phone number' },
+  phone: { required: true, description: 'Primary phone number' },
   email: { required: true, description: 'Email address' },
   state: { required: true, description: 'US state code (e.g., FL)' },
   zip: { required: true, description: 'ZIP code' },
   stage: { required: false, description: 'consultation | exit_plan | in_progress | resolved (default: consultation)' },
-  case_opened_at: { required: false, description: 'ISO date (YYYY-MM-DD) or leave blank for auto' },
-  tags: { required: false, description: 'Semicolon-separated tags (e.g., "vip; timeshare")' },
-  resort_name: { required: false, description: 'Property resort/complex name' },
+  case_opened_at: { required: false, description: 'YYYY-MM-DD or M/D/YYYY — blank = today' },
+  tags: { required: false, description: 'Comma or semicolon separated (e.g., "VIP, Referral")' },
+  co_client_name: { required: false, description: 'Second client on the case (spouse, co-owner)' },
+  dob: { required: false, description: 'Date of birth — YYYY-MM-DD or M/D/YYYY' },
+  ssn_last4: { required: false, description: 'Last 4 of SSN — exactly 4 digits' },
+  address: { required: false, description: 'Street, city' },
+  phone2: { required: false, description: 'Secondary phone' },
+  retainer_fee: { required: false, description: 'Retainer amount (e.g., 3500 or $3,500)' },
+  resort_name: { required: false, description: 'Resort/complex name — starts a property row' },
   resort_location: { required: false, description: 'Property location (city, state)' },
   unit_number: { required: false, description: 'Unit or lot number' },
-  purchase_price: { required: false, description: 'Original purchase price (numeric)' },
-  loan_balance: { required: false, description: 'Current loan balance (numeric)' },
-  maintenance_fee: { required: false, description: 'Annual maintenance fee (numeric)' },
-  fee_due_date: { required: false, description: 'Fee due date (YYYY-MM-DD)' },
-  document_reference: { required: false, description: 'Document or contract reference number' },
+  purchase_price: { required: false, description: 'Original purchase price (e.g., 45000 or $45,000)' },
+  loan_balance: { required: false, description: 'Current loan balance' },
+  maintenance_fee: { required: false, description: 'Annual maintenance fee' },
+  fee_due_date: { required: false, description: 'Fee due date — YYYY-MM-DD or M/D/YYYY' },
+  document_reference: { required: false, description: 'Contract URL or reference' },
+  usage_frequency: { required: false, description: 'annual | biennial | odd_year | even_year' },
+  usage_type: { required: false, description: 'fixed_week | floating_week | points_based' },
+  fees_current: { required: false, description: 'true/false/yes/no — are maintenance fees up to date?' },
+  fees_behind_amount: { required: false, description: 'Amount behind on fees (if not current)' },
+  maintenance_fees_billed: { required: false, description: 'Total maintenance fees billed to date' },
 }
+
+type ImportResult =
+  | { success: true; imported: number; properties: number; duplicates: number; warnings: string[] }
+  | { success: false; error: string }
 
 export function CsvImportExport() {
   const [importing, setImporting] = useState(false)
   const [exporting, setExporting] = useState(false)
-  const [importResult, setImportResult] = useState<{ success: boolean; count?: number; imported?: number; duplicates?: number; error?: string } | null>(null)
+  const [importResult, setImportResult] = useState<ImportResult | null>(null)
   const [showSchema, setShowSchema] = useState(false)
   const fileRef = useRef<HTMLInputElement>(null)
 
@@ -71,12 +86,18 @@ export function CsvImportExport() {
     try {
       const text = await file.text()
       const result = await importClientsFromCsv(text)
-      setImportResult({ success: true, imported: result.imported, duplicates: result.duplicates })
-      toast.success(`Imported ${result.imported} clients, ${result.duplicates} duplicates found`)
+      setImportResult({
+        success: true,
+        imported: result.imported,
+        properties: result.properties,
+        duplicates: result.duplicates,
+        warnings: result.warnings,
+      })
+      toast.success(`Imported ${result.imported} clients with ${result.properties} properties`)
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Import failed'
       setImportResult({ success: false, error: message })
-      toast.error(message)
+      toast.error('Import failed — nothing was imported')
     } finally {
       setImporting(false)
       if (fileRef.current) fileRef.current.value = ''
@@ -101,7 +122,9 @@ export function CsvImportExport() {
         <FileText className="w-5 h-5 text-muted-foreground" />
         <h2 className="text-lg font-semibold">CSV Import / Export</h2>
       </div>
-      <p className="text-sm text-muted-foreground mb-6">Import clients from CSV files or export your current data</p>
+      <p className="text-sm text-muted-foreground mb-6">
+        Import clients from CSV files or export your current data. One row = one property — repeat the client on multiple rows to import several properties for them.
+      </p>
 
       {/* Actions */}
       <div className="flex flex-wrap gap-3 mb-6">
@@ -147,21 +170,43 @@ export function CsvImportExport() {
             initial={{ opacity: 0, height: 0 }}
             animate={{ opacity: 1, height: 'auto' }}
             exit={{ opacity: 0, height: 0 }}
-            className="mb-6"
+            className="mb-6 space-y-2"
           >
-            <div className={`flex items-center gap-3 p-4 rounded-lg ${importResult.success ? 'bg-surface-success border border-surface-success-fg/30' : 'bg-surface-danger border border-surface-danger-fg/30'}`}>
-              {importResult.success ? (
-                <>
-                  <CheckCircle className="w-5 h-5 text-surface-success-fg" />
-                  <span className="text-sm text-surface-success-fg">Successfully imported {importResult.count} clients</span>
-                </>
-              ) : (
-                <>
-                  <XCircle className="w-5 h-5 text-surface-danger-fg" />
-                  <span className="text-sm text-surface-danger-fg">{importResult.error}</span>
-                </>
-              )}
-            </div>
+            {importResult.success ? (
+              <>
+                <div className="flex items-center gap-3 p-4 rounded-lg bg-surface-success border border-surface-success-fg/30">
+                  <CheckCircle className="w-5 h-5 text-surface-success-fg flex-shrink-0" />
+                  <span className="text-sm text-surface-success-fg">
+                    Imported {importResult.imported} client{importResult.imported !== 1 ? 's' : ''} with {importResult.properties} propert{importResult.properties !== 1 ? 'ies' : 'y'}
+                    {importResult.duplicates > 0 && ` · ${importResult.duplicates} duplicate${importResult.duplicates !== 1 ? 's' : ''} skipped`}
+                  </span>
+                </div>
+                {importResult.warnings.length > 0 && (
+                  <div className="p-4 rounded-lg bg-surface-warning border border-surface-warning-fg/30">
+                    <div className="flex items-center gap-2 text-surface-warning-fg font-medium text-sm mb-2">
+                      <AlertTriangle className="w-4 h-4" />
+                      {importResult.warnings.length} warning{importResult.warnings.length !== 1 ? 's' : ''} (imported anyway)
+                    </div>
+                    <ul className="text-xs text-surface-warning-fg space-y-1 list-disc list-inside">
+                      {importResult.warnings.slice(0, 8).map((w, i) => (
+                        <li key={i}>{w}</li>
+                      ))}
+                      {importResult.warnings.length > 8 && (
+                        <li>…and {importResult.warnings.length - 8} more</li>
+                      )}
+                    </ul>
+                  </div>
+                )}
+              </>
+            ) : (
+              <div className="p-4 rounded-lg bg-surface-danger border border-surface-danger-fg/30">
+                <div className="flex items-center gap-2 text-surface-danger-fg font-medium text-sm mb-2">
+                  <XCircle className="w-5 h-5" />
+                  Import failed — nothing was imported
+                </div>
+                <pre className="text-xs text-surface-danger-fg whitespace-pre-wrap font-sans">{importResult.error}</pre>
+              </div>
+            )}
           </motion.div>
         )}
       </AnimatePresence>
@@ -182,7 +227,7 @@ export function CsvImportExport() {
                   const field = FIELD_DESCRIPTIONS[header]
                   return (
                     <div key={header} className="flex items-start gap-3 text-sm">
-                      <code className="font-mono text-xs bg-background px-2 py-0.5 rounded border min-w-[140px]">
+                      <code className="font-mono text-xs bg-background px-2 py-0.5 rounded border min-w-[180px] flex-shrink-0">
                         {header}
                         {field.required && <span className="text-red-500 ml-1">*</span>}
                       </code>
@@ -191,7 +236,12 @@ export function CsvImportExport() {
                   )
                 })}
               </div>
-              <p className="text-xs text-muted-foreground mt-3">* Required fields. One row = one client + optional one property.</p>
+              <div className="text-xs text-muted-foreground mt-4 space-y-1">
+                <p>* Required on every row.</p>
+                <p><strong>Multiple properties:</strong> one row per property — repeat the client&apos;s details on each row and they&apos;ll be grouped into one client.</p>
+                <p>Rows matching an existing client (same name + phone or email) are skipped as duplicates.</p>
+                <p>Any row error aborts the whole import — nothing is partially imported.</p>
+              </div>
             </div>
           </motion.div>
         )}
