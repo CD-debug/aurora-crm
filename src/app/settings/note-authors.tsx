@@ -11,7 +11,6 @@ export function NoteAuthors() {
   const [loading, setLoading] = useState(true)
   const [newName, setNewName] = useState('')
   const [saving, setSaving] = useState(false)
-  const [deletingId, setDeletingId] = useState<string | null>(null)
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null)
 
   const load = async () => {
@@ -118,20 +117,32 @@ export function NoteAuthors() {
               className="flex items-center justify-between p-3 rounded-lg bg-background border hover:bg-muted/50 transition-colors"
             >
               <span className="font-medium">{author.name}</span>
-              <button
-                onClick={() => handleDelete(author.id)}
-                className="flex-shrink-0 p-1.5 rounded text-muted-foreground hover:bg-red-50 hover:text-red-600 transition-colors"
-                aria-label={`Remove ${author.name}`}
-              >
-                {confirmDeleteId === author.id ? (
-                  <span className="flex items-center gap-1 text-xs">
-                    <Check className="w-3 h-3 text-green-600" onClick={(e) => e.stopPropagation()} /> Yes
-                    <X className="w-3 h-3" onClick={(e) => { e.stopPropagation(); setConfirmDeleteId(null); }} />
-                  </span>
-                ) : (
+              {confirmDeleteId === author.id ? (
+                <div className="flex items-center gap-1">
+                  <button
+                    onClick={() => handleDelete(author.id)}
+                    className="inline-flex items-center gap-1 px-2 py-1 rounded text-xs font-medium bg-surface-danger text-surface-danger-fg hover:bg-surface-danger/80 transition-colors"
+                    aria-label={`Confirm remove ${author.name}`}
+                  >
+                    <Check className="w-3 h-3" /> Confirm
+                  </button>
+                  <button
+                    onClick={() => setConfirmDeleteId(null)}
+                    className="inline-flex items-center gap-1 px-2 py-1 rounded text-xs font-medium bg-muted text-muted-foreground hover:bg-muted/70 transition-colors"
+                    aria-label="Cancel removal"
+                  >
+                    <X className="w-3 h-3" /> Cancel
+                  </button>
+                </div>
+              ) : (
+                <button
+                  onClick={() => handleDelete(author.id)}
+                  className="flex-shrink-0 p-1.5 rounded text-muted-foreground hover:bg-red-50 hover:text-red-600 transition-colors"
+                  aria-label={`Remove ${author.name}`}
+                >
                   <Trash2 className="w-4 h-4" />
-                )}
-              </button>
+                </button>
+              )}
             </li>
           ))}
         </ul>

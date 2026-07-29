@@ -645,7 +645,7 @@ export default function Client360Page() {
                 transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1], delay: 0.3 }}
                 id="notes" className="rounded-xl border bg-card scroll-mt-24"
               >
-<div className="p-4 border-b">
+                <div className="p-4 border-b">
                   <h2 className="text-lg font-semibold flex items-center gap-2">
                     <FileText className="w-5 h-5" />
                     Notes & Communication ({notes.length})
@@ -772,7 +772,7 @@ export default function Client360Page() {
                                 </div>
                               </div>
                               {isEditing ? (
-                                <div className="flex gap-2 mt-2">
+                                <div className="flex flex-col gap-2 mt-2">
                                   <Textarea
                                     value={editingContent}
                                     onChange={(e) => setEditingContent(e.target.value)}
@@ -780,13 +780,21 @@ export default function Client360Page() {
                                       if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') handleUpdateNote(note.id, editingContent)
                                       if (e.key === 'Escape') setEditingNoteId(null)
                                     }}
-                                    rows={3}
+                                    rows={4}
                                     className="flex-1"
                                     autoFocus
+                                    placeholder="Edit note…"
                                   />
-                                  <div className="flex flex-col gap-1 self-end">
-                                    <Button size="sm" onClick={() => handleUpdateNote(note.id, editingContent)}><Save className="w-4 h-4" /></Button>
-                                    <Button size="sm" variant="ghost" onClick={() => setEditingNoteId(null)}><X className="w-4 h-4" /></Button>
+                                  <div className="flex items-center justify-end gap-2">
+                                    <span className="text-xs text-muted-foreground mr-auto">Ctrl+Enter to save · Esc to cancel</span>
+                                    <Button size="sm" variant="ghost" onClick={() => setEditingNoteId(null)}>
+                                      <X className="w-3.5 h-3.5 mr-1" />
+                                      Cancel
+                                    </Button>
+                                    <Button size="sm" onClick={() => handleUpdateNote(note.id, editingContent)} disabled={!editingContent.trim()}>
+                                      <Save className="w-3.5 h-3.5 mr-1" />
+                                      Save
+                                    </Button>
                                   </div>
                                 </div>
                               ) : (
@@ -810,7 +818,7 @@ export default function Client360Page() {
               >
                 <h2 className="text-lg font-semibold mb-4">Activity Timeline</h2>
                 <ActivityTimeline items={[
-                  ...notes.map(n => ({ id: n.id, type: 'note' as const, title: 'Note', description: n.content, date: n.created_at })),
+                  ...notes.map(n => ({ id: n.id, type: 'note' as const, title: n.note_authors?.name ? `Note by ${n.note_authors.name}` : 'Note', description: n.content, date: n.created_at })),
                   ...tasks.map(t => ({ id: t.id, type: 'task' as const, title: t.title, description: t.completed_at ? 'Completed' : t.due_date ? `Due ${new Date(t.due_date).toLocaleDateString()}` : undefined, date: t.created_at })),
                   ...properties.map(p => ({ id: p.id, type: 'property' as const, title: `Property: ${p.resort_name}`, description: p.status === 'paid_off' ? 'Paid off' : undefined, date: p.created_at })),
                 ]} />
