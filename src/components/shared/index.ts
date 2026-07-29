@@ -1,6 +1,7 @@
 export { NavRail } from './NavRail'
 export { GlobalSearch } from './GlobalSearch'
-export { Breadcrumb } from './PageHeader'
+export { PageHeader, Breadcrumb } from './PageHeader'
+export { AuroraMark, Wordmark } from './AuroraMark'
 export { AuroraArcStepper } from './AuroraArcStepper'
 export { ClientCombobox } from './ClientCombobox'
 export { PhoneInput, CurrencyInput, SsnInput, YesNoToggle, ConditionalField } from './inputs'

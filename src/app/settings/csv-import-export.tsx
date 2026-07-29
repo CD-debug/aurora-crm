@@ -153,16 +153,16 @@ export function CsvImportExport() {
             exit={{ opacity: 0, height: 0 }}
             className="mb-6"
           >
-            <div className={`flex items-center gap-3 p-4 rounded-lg ${importResult.success ? 'bg-green-50 border border-green-200' : 'bg-red-50 border border-red-200'}`}>
+            <div className={`flex items-center gap-3 p-4 rounded-lg ${importResult.success ? 'bg-surface-success border border-surface-success-fg/30' : 'bg-surface-danger border border-surface-danger-fg/30'}`}>
               {importResult.success ? (
                 <>
-                  <CheckCircle className="w-5 h-5 text-green-600" />
-                  <span className="text-sm text-green-800">Successfully imported {importResult.count} clients</span>
+                  <CheckCircle className="w-5 h-5 text-surface-success-fg" />
+                  <span className="text-sm text-surface-success-fg">Successfully imported {importResult.count} clients</span>
                 </>
               ) : (
                 <>
-                  <XCircle className="w-5 h-5 text-red-600" />
-                  <span className="text-sm text-red-800">{importResult.error}</span>
+                  <XCircle className="w-5 h-5 text-surface-danger-fg" />
+                  <span className="text-sm text-surface-danger-fg">{importResult.error}</span>
                 </>
               )}
             </div>

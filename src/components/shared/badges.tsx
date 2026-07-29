@@ -4,9 +4,9 @@ import type { HealthStatus, PipelineStage, TaskStatus } from '@/lib/data/types'
 import { HEALTH_LABELS, STAGE_LABELS } from '@/lib/data/domain'
 
 const healthVariants: Record<HealthStatus, string> = {
-  on_track: 'bg-green-100 text-green-800 border-green-200',
-  at_risk: 'bg-amber-100 text-amber-800 border-amber-200',
-  stalled: 'bg-red-100 text-red-800 border-red-200',
+  on_track: 'bg-surface-success text-surface-success-fg border-surface-success-fg/30',
+  at_risk: 'bg-surface-warning text-surface-warning-fg border-surface-warning-fg/30',
+  stalled: 'bg-surface-danger text-surface-danger-fg border-surface-danger-fg/30',
 }
 
 export function ClientHealthBadge({ status, className }: { status: HealthStatus; className?: string }) {
@@ -18,9 +18,9 @@ export function ClientHealthBadge({ status, className }: { status: HealthStatus;
 }
 
 const taskVariants: Record<TaskStatus, string> = {
-  upcoming: 'bg-blue-100 text-blue-800 border-blue-200',
-  overdue: 'bg-red-100 text-red-800 border-red-200',
-  completed: 'bg-green-100 text-green-800 border-green-200',
+  upcoming: 'bg-chart-2/10 text-chart-2 border-chart-2/30',
+  overdue: 'bg-surface-danger text-surface-danger-fg border-surface-danger-fg/30',
+  completed: 'bg-surface-success text-surface-success-fg border-surface-success-fg/30',
 }
 
 const taskLabels: Record<TaskStatus, string> = {
@@ -41,7 +41,7 @@ export function TaskStatusBadge({
 }) {
   if (status === 'upcoming' && dueSoon) {
     return (
-      <Badge variant="outline" className={cn('bg-amber-100 text-amber-800 border-amber-200', className)}>
+      <Badge variant="outline" className={cn('bg-surface-warning text-surface-warning-fg border-surface-warning-fg/30', className)}>
         Due Soon
       </Badge>
     )
@@ -54,10 +54,10 @@ export function TaskStatusBadge({
 }
 
 const stageVariants: Record<PipelineStage, string> = {
-  consultation: 'bg-blue-100 text-blue-800 border-blue-200',
-  exit_plan: 'bg-indigo-100 text-indigo-800 border-indigo-200',
-  in_progress: 'bg-amber-100 text-amber-800 border-amber-200',
-  resolved: 'bg-green-100 text-green-800 border-green-200',
+  consultation: 'bg-chart-1/10 text-chart-1 border-chart-1/30',
+  exit_plan: 'bg-chart-2/10 text-chart-2 border-chart-2/30',
+  in_progress: 'bg-surface-warning text-surface-warning-fg border-surface-warning-fg/30',
+  resolved: 'bg-surface-success text-surface-success-fg border-surface-success-fg/30',
 }
 
 export function StageBadge({ stage, className }: { stage: PipelineStage; className?: string }) {

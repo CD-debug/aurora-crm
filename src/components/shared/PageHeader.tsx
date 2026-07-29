@@ -1,39 +1,46 @@
 'use client'
 
-import Link from 'next/link'
+import { type ReactNode } from 'react'
 import { cn } from '@/lib/utils'
-import { ChevronRight } from 'lucide-react'
+import { Breadcrumb } from './Breadcrumb'
 
-interface BreadcrumbProps {
-  items: Array<{ label: string; href?: string }>
-  className?: string
+interface BreadcrumbItem {
+  label: string
+  href?: string
 }
 
-export function Breadcrumb({ items, className }: BreadcrumbProps) {
+/** Reusable page header: sticky bar with breadcrumb + title + subtitle + optional actions. */
+export function PageHeader({
+  title,
+  subtitle,
+  actions,
+  breadcrumb,
+  className,
+}: {
+  title: string
+  subtitle?: string | ReactNode
+  actions?: ReactNode
+  breadcrumb?: BreadcrumbItem[]
+  className?: string
+}) {
   return (
-    <nav className={cn('flex items-center gap-1 text-sm', className)} aria-label="Breadcrumb">
-      <ol className="flex items-center gap-1">
-        {items.map((item, index) => (
-          <li key={item.label} className="flex items-center gap-1">
-            {index > 0 && <ChevronRight className="h-4 w-4 text-muted-foreground" />}
-            {item.href ? (
-              <Link
-                href={item.href}
-                className={cn(
-                  'font-medium transition-colors',
-                  index === items.length - 1
-                    ? 'text-foreground'
-                    : 'text-muted-foreground hover:text-foreground'
-                )}
-              >
-                {item.label}
-              </Link>
-            ) : (
-              <span className="text-foreground font-medium">{item.label}</span>
+    <header className={cn('border-b border-border bg-background/95 backdrop-blur sticky top-0 z-30', className)}>
+      <div className="container mx-auto px-4 py-3">
+        {breadcrumb && breadcrumb.length > 0 && (
+          <Breadcrumb items={breadcrumb} className="mb-1" />
+        )}
+        <div className="flex items-center justify-between gap-4">
+          <div>
+            <h1 className="text-2xl font-heading font-semibold">{title}</h1>
+            {subtitle && (
+              <p className="text-sm text-muted-foreground mt-0.5">{subtitle}</p>
             )}
-          </li>
-        ))}
-      </ol>
-    </nav>
+          </div>
+          {actions && <div className="flex-shrink-0">{actions}</div>}
+        </div>
+      </div>
+    </header>
   )
 }
+
+export { Breadcrumb }

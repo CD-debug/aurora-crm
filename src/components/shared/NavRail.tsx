@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { cn } from '@/lib/utils'
 import { LayoutDashboard, Users, ListChecks, BarChart3, Settings } from 'lucide-react'
 import { GlobalSearch } from './GlobalSearch'
+import { AuroraMark } from './AuroraMark'
 import { usePathname } from 'next/navigation'
 import { useEffect, useState } from 'react'
 
@@ -32,10 +33,10 @@ export function NavRail() {
     <aside className="fixed left-0 top-0 z-40 h-screen w-16 bg-sidebar border-r border-sidebar-border flex flex-col items-center">
       <Link
         href="/"
-        className="mt-4 mb-6 flex items-center justify-center w-9 h-9 rounded-xl bg-aurora-arc text-white font-heading font-bold text-lg transition-transform hover:scale-110"
+        className="mt-4 mb-6 flex items-center justify-center"
         aria-label="Aurora home"
       >
-        A
+        <AuroraMark size="sm" />
       </Link>
 
       <nav className="relative flex flex-col items-center gap-1" aria-label="Main navigation">
@@ -54,7 +55,7 @@ export function NavRail() {
                 'group relative flex items-center justify-center w-12 h-11 rounded-xl text-sm font-medium transition-all duration-150',
                 isActive
                   ? 'text-foreground bg-primary/10'
-                  : 'text-sidebar-foreground/50 hover:text-sidebar-foreground hover:bg-sidebar-accent hover:scale-110'
+                  : 'text-sidebar-foreground/50 hover:text-sidebar-foreground hover:bg-sidebar-accent'
               )}
               aria-label={item.label}
               tabIndex={0}

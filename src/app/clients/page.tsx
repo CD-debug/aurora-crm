@@ -355,12 +355,12 @@ function ClientsPageContent() {
 
             {duplicates.length > 0 ? (
               <div className="p-4 space-y-4">
-                <div className="rounded-lg border border-amber-200 bg-amber-50 p-4">
-                  <div className="flex items-center gap-2 text-amber-800 font-medium mb-2">
+                <div className="rounded-lg border border-surface-warning-fg/30 bg-surface-warning p-4">
+                  <div className="flex items-center gap-2 text-surface-warning-fg font-medium mb-2">
                     <AlertTriangle className="w-4 h-4" />
                     Possible duplicate{duplicates.length > 1 ? 's' : ''} found
                   </div>
-                  <p className="text-sm text-amber-800 mb-3">
+                  <p className="text-sm text-surface-warning-fg mb-3">
                     {duplicates.length === 1 ? 'A client' : 'Clients'} with matching name, email, or phone already
                     {duplicates.length === 1 ? ' exists' : ' exist'}:
                   </p>

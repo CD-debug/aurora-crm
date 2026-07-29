@@ -423,7 +423,7 @@ export default function Client360Page() {
               <div className="flex items-center gap-1.5">
                 <CalendarDays className="w-3.5 h-3.5 text-muted-foreground" />
                 <span className="text-muted-foreground">DOB</span>
-                <span className="font-mono tabular-nums">{format(parseISO(client.dob), 'MMM d, yyyy')}</span>
+                <span className="font-mono tabular-nums">{client.dob ? format(parseISO(client.dob), 'MMM d, yyyy') : '—'}</span>
               </div>
             )}
             {client.ssn_last4 && (
@@ -1045,12 +1045,12 @@ function StatCard({
   warn?: boolean
 }) {
   return (
-    <div className={cn('p-4 rounded-lg border transition-all hover:shadow-sm', warn ? 'border-amber-300 bg-amber-50' : 'bg-muted/30 hover:bg-muted/50')}>
-      <div className={cn('flex items-center gap-2 text-sm mb-1', warn ? 'text-amber-800' : 'text-muted-foreground')}>
+    <div className={cn('p-4 rounded-lg border transition-all hover:shadow-sm', warn ? 'border-surface-warning-fg/30 bg-surface-warning' : 'bg-muted/30 hover:bg-muted/50')}>
+      <div className={cn('flex items-center gap-2 text-sm mb-1', warn ? 'text-surface-warning-fg' : 'text-muted-foreground')}>
         {icon}
         <span>{label}</span>
       </div>
-      <p className={cn('font-bold font-mono tabular-nums', small ? 'text-lg' : 'text-2xl', warn && 'text-amber-900')}>{value}</p>
+      <p className={cn('font-bold font-mono tabular-nums', small ? 'text-lg' : 'text-2xl', warn && 'text-surface-warning-fg')}>{value}</p>
     </div>
   )
 }
@@ -1066,18 +1066,18 @@ function PropertyCard({
 }) {
   const isPaid = p.status === 'paid_off'
   return (
-    <div className={cn('p-4 hover:bg-muted/30 transition-all hover:shadow-sm group', isPaid && 'bg-green-50/40')}>
+    <div className={cn('p-4 hover:bg-muted/30 transition-all hover:shadow-sm group', isPaid && 'bg-surface-success/20')}>
       <div className="flex items-start justify-between gap-4">
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 flex-wrap mb-1">
             <span className="font-medium">{p.resort_name}</span>
             <Badge variant="outline" className={cn(
-              isPaid ? 'bg-green-100 text-green-800 border-green-200' : 'bg-blue-100 text-blue-800 border-blue-200'
+              isPaid ? 'bg-surface-success text-surface-success-fg border-surface-success-fg/30' : 'bg-chart-2/10 text-chart-2 border-chart-2/30'
             )}>
               {isPaid ? 'Paid Off' : p.status.replace('_', ' ')}
             </Badge>
             {!p.document_reference ? (
-              <Badge variant="outline" className="bg-amber-100 text-amber-800 border-amber-200">No document URL</Badge>
+              <Badge variant="outline" className="bg-surface-warning text-surface-warning-fg border-surface-warning-fg/30">No document URL</Badge>
             ) : (
               <a href={p.document_reference} target="_blank" rel="noreferrer" className="text-xs text-primary hover:underline flex items-center gap-1">
                 <FileText className="w-3 h-3" /> Contract
@@ -1094,7 +1094,7 @@ function PropertyCard({
             </div>
           )}
           {!isPaid && p.fees_current === false && (
-            <p className="text-xs text-amber-700 mt-1 font-medium">
+            <p className="text-xs text-surface-warning-fg mt-1 font-medium">
               Behind on fees{p.fees_behind_amount != null ? ` — ${Number(p.fees_behind_amount).toLocaleString('en-US', { style: 'currency', currency: 'USD' })}` : ''}
             </p>
           )}

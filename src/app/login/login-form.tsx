@@ -7,17 +7,10 @@ import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { Badge } from '@/components/ui/badge'
 import { toast } from 'sonner'
 import { motion } from 'framer-motion'
-
-function AuroraOrb({ size = 'md' }: { size?: 'sm' | 'md' }) {
-  const dim = size === 'md' ? 'w-12 h-12' : 'w-10 h-10'
-  return (
-    <div className={`${dim} rounded-2xl bg-aurora-arc text-white font-heading font-bold text-2xl flex items-center justify-center shadow-lg`}>
-      A
-    </div>
-  )
-}
+import { AuroraMark } from '@/components/shared'
 
 export default function LoginForm() {
   const router = useRouter()
@@ -45,21 +38,53 @@ export default function LoginForm() {
     }
   }
 
+  const fillDemo = () => {
+    setEmail('demo@auroracrm.com')
+    setPassword('Aurora2026!')
+  }
+
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-[#0D9C8D]/12 via-background to-[#4338CA]/12 p-6">
-      <motion.div
-        initial={{ opacity: 0, y: 16 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
-        className="w-full max-w-md"
-      >
-        <div className="rounded-2xl border bg-card p-8 shadow-sm">
-          <div className="flex flex-col items-center text-center mb-6">
-            <AuroraOrb size="md" />
-            <h1 className="mt-4 text-2xl font-heading font-semibold tracking-tight">Aurora</h1>
-            <p className="text-sm text-muted-foreground mt-1">
+    <div className="min-h-screen grid grid-cols-1 lg:grid-cols-[1fr_1.1fr]">
+      {/* Left brand panel */}
+      <div className="hidden lg:flex flex-col justify-between bg-[oklch(0.18_0.02_255)] p-10">
+        <div>
+          <div className="flex items-center gap-3">
+            <AuroraMark size="md" showWordmark />
+            <span className="font-heading font-medium tracking-[-0.02em] text-xl text-background">
+              Aurora
+            </span>
+          </div>
+        </div>
+        <div className="space-y-6">
+          <p className="font-heading text-3xl leading-tight text-background font-normal tracking-[-0.02em]">
+            Case management for timeshare exit.
+          </p>
+          <p className="text-sm text-background/40 font-mono">
+            v2.0 · trusted by 47 firms
+          </p>
+        </div>
+      </div>
+
+      {/* Right form panel */}
+      <div className="flex items-center justify-center p-6">
+        <motion.div
+          initial={{ opacity: 0, y: 16 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
+          className="w-full max-w-sm"
+        >
+          {/* Mobile brand lockup */}
+          <div className="flex flex-col items-center text-center mb-8 lg:hidden">
+            <AuroraMark size="md" showWordmark />
+            <p className="text-sm text-muted-foreground mt-2">
               Sign in to your Aurora workspace.
             </p>
+          </div>
+
+          {/* Desktop heading */}
+          <div className="hidden lg:block mb-8">
+            <h1 className="text-2xl font-heading font-semibold tracking-tight">Sign in</h1>
+            <p className="text-sm text-muted-foreground mt-1">to your Aurora workspace.</p>
           </div>
 
           <form onSubmit={handleLogin} className="space-y-4">
@@ -94,20 +119,17 @@ export default function LoginForm() {
             </Button>
           </form>
 
-          <div className="mt-6 pt-5 border-t border-border space-y-2">
-            <p className="text-xs text-muted-foreground text-center">
-              Demo access:{' '}
-              <button
-                type="button"
-                onClick={() => {
-                  setEmail('demo@auroracrm.com')
-                  setPassword('Aurora2026!')
-                }}
-                className="font-mono text-xs text-foreground/80 hover:text-foreground underline-offset-2 hover:underline"
+          <div className="mt-6 pt-5 border-t border-border space-y-3">
+            <div className="flex items-center justify-center gap-2 text-xs text-muted-foreground">
+              <span>Demo access:</span>
+              <Badge
+                variant="outline"
+                className="cursor-pointer font-mono text-xs hover:bg-muted/40"
+                onClick={fillDemo}
               >
                 demo@auroracrm.com
-              </button>
-            </p>
+              </Badge>
+            </div>
             <p className="text-xs text-muted-foreground text-center">
               New timeshare inquiry?{' '}
               <Link href="/lead" className="text-primary hover:underline">
@@ -115,8 +137,8 @@ export default function LoginForm() {
               </Link>
             </p>
           </div>
-        </div>
-      </motion.div>
+        </motion.div>
+      </div>
     </div>
   )
 }

@@ -26,6 +26,15 @@
   --color-ring: var(--ring);
   --color-input: var(--input);
   --color-border: var(--border);
+  --color-surface-warning: var(--surface-warning);
+  --color-surface-warning-fg: var(--surface-warning-fg);
+  --color-surface-danger: var(--surface-danger);
+  --color-surface-danger-fg: var(--surface-danger-fg);
+  --color-surface-success: var(--surface-success);
+  --color-surface-success-fg: var(--surface-success-fg);
+  --color-surface-1: var(--surface-1);
+  --color-surface-2: var(--surface-2);
+  --color-surface-3: var(--surface-3);
   --color-destructive: var(--destructive);
   --color-accent-foreground: var(--accent-foreground);
   --color-accent: var(--accent);
@@ -86,6 +95,17 @@
   /* Aurora Arc Gradient Stops */
   --arc-start: oklch(0.55 0.15 185); /* Horizon Teal */
   --arc-end: oklch(0.52 0.15 280); /* Dusk Indigo */
+
+  /* Semantic Surface Tokens — replace raw Tailwind amber/red/green patterns */
+  --surface-warning: oklch(0.97 0.04 75);
+  --surface-warning-fg: oklch(0.35 0.12 60);
+  --surface-danger: oklch(0.96 0.05 25);
+  --surface-danger-fg: oklch(0.40 0.18 25);
+  --surface-success: oklch(0.96 0.04 145);
+  --surface-success-fg: oklch(0.32 0.10 145);
+  --surface-1: oklch(0.99 0.003 240);
+  --surface-2: oklch(0.96 0.005 240);
+  --surface-3: oklch(0.92 0.008 240);
 }
 
 .dark {

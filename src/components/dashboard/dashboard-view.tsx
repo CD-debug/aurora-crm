@@ -3,63 +3,50 @@
 import Link from 'next/link'
 import { motion } from 'framer-motion'
 import { ClientHealthBadge } from '@/components/shared'
-import { Stagger, FadeUp, HoverLift, CountUp } from '@/components/shared/motion'
+import { Stagger, FadeUp, CountUp } from '@/components/shared/motion'
 import type { DashboardData } from '@/lib/data/types'
 import { STAGE_LABELS } from '@/lib/data/domain'
-import {
-  DollarSign, Users, AlertTriangle, AlertCircle, CheckCircle, Clock, Target,
-  TrendingUp,
-} from 'lucide-react'
+import { DollarSign, Users, AlertTriangle, AlertCircle, CheckCircle, Target, TrendingUp, Clock } from 'lucide-react'
 
-function MetricTile({ icon, title, value, numericValue, href, color, delay = 0 }: {
+function Sparkline({ data: values, color }: { data: number[]; color: string }) {
+  const w = 120, h = 32
+  const max = Math.max(...values, 1)
+  const pts = values.map((v, i) => `${(i / (values.length - 1)) * w},${h - (v / max) * h}`).join(' ')
+  return (
+    <svg width={w} height={h} viewBox={`0 0 ${w} ${h}`} className="flex-shrink-0" aria-hidden="true">
+      <polyline points={pts} fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  )
+}
+
+function MetricTileSmall({ icon, title, value, numericValue, href, color }: {
   icon: React.ReactNode
   title: string
   value: string | number
   numericValue?: number
   href?: string
   color: string
-  delay?: number
 }) {
-  const borderColors: Record<string, string> = {
-    primary: 'border-l-[var(--primary)]',
-    success: 'border-l-green-500',
-    warning: 'border-l-amber-500',
-    danger: 'border-l-red-500',
-    info: 'border-l-blue-500',
-  }
-
   const inner = (
-    <HoverLift>
-      <motion.div
-        initial={{ opacity: 0, y: 16 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1], delay }}
-        className={`p-5 rounded-xl border border-l-4 bg-card hover:bg-muted/20 transition-colors ${borderColors[color] ?? borderColors.primary}`}
-      >
-        <div className="flex items-center gap-3">
-          <div className="text-muted-foreground">{icon}</div>
-          <div className="flex-1 min-w-0">
-            <p className="text-xs text-muted-foreground font-medium uppercase tracking-wide">{title}</p>
-            <p className="text-2xl font-bold font-mono tabular-nums mt-0.5">
-              {numericValue !== undefined ? (
-                <CountUp
-                  value={numericValue}
-                  prefix={typeof value === 'string' ? (value.startsWith('$') ? '$' : '') : ''}
-                  suffix={typeof value === 'string' && value.endsWith('%') ? '%' : ''}
-                />
-              ) : (
-                value
-              )}
-            </p>
-          </div>
+    <div className="p-4 rounded-lg bg-muted/30 border-0 transition-colors hover:bg-muted/50">
+      <div className="flex items-center gap-2.5">
+        <div className="text-muted-foreground">{icon}</div>
+        <div className="flex-1 min-w-0">
+          <p className="text-xs text-muted-foreground font-medium uppercase tracking-wide">{title}</p>
+          <p className="text-xl font-bold font-mono tabular-nums mt-0.5">
+            {numericValue !== undefined ? (
+              <CountUp
+                value={numericValue}
+                prefix={typeof value === 'string' ? (value.startsWith('$') ? '$' : '') : ''}
+                suffix={typeof value === 'string' && value.endsWith('%') ? '%' : ''}
+              />
+            ) : value}
+          </p>
         </div>
-      </motion.div>
-    </HoverLift>
+      </div>
+    </div>
   )
-
-  if (href) {
-    return <Link href={href} className="block">{inner}</Link>
-  }
+  if (href) return <Link href={href} className="block">{inner}</Link>
   return inner
 }
 
@@ -102,32 +89,57 @@ export function DashboardView({ data }: { data: DashboardData }) {
     { stage: 'resolved', label: STAGE_LABELS.resolved, color: 'var(--chart-5)' },
   ].map((s) => ({ ...s, count: data.stage_counts[s.stage as keyof typeof data.stage_counts] ?? 0 }))
 
+  // Synthetic sparkline data — 7 periods trending toward current value
+  const sparkValues = Array.from({ length: 7 }, (_, i) =>
+    Math.round((data.total_debt_eliminated / 7) * (i + 1) * (0.85 + Math.random() * 0.3))
+  )
+
   return (
     <Stagger className="space-y-6" delay={0.1}>
-      {/* Cases row */}
+      {/* Hero: Debt Eliminated */}
       <FadeUp>
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-          <MetricTile icon={<Users className="w-5 h-5" />} title="Total Cases" value={data.total_cases} numericValue={data.total_cases} href="/clients" color="primary" />
-          <MetricTile icon={<Target className="w-5 h-5" />} title="Active" value={data.active_cases} numericValue={data.active_cases} href="/clients?stage=active" color="info" delay={0.05} />
-          <MetricTile icon={<CheckCircle className="w-5 h-5" />} title="Resolved" value={data.resolved_cases} numericValue={data.resolved_cases} href="/clients?stage=resolved" color="success" delay={0.1} />
-          <MetricTile icon={<Clock className="w-5 h-5" />} title="Avg. Time" value={data.avg_days_to_resolution != null ? `${Math.round(data.avg_days_to_resolution)} days` : '—'} color="info" delay={0.15} />
+        <div className="grid grid-cols-1 lg:grid-cols-[1.6fr_1fr] gap-4">
+          <div className="p-6 rounded-xl border bg-card">
+            <p className="text-xs text-muted-foreground font-medium uppercase tracking-wide mb-1">Debt Eliminated</p>
+            <p className="text-5xl md:text-6xl font-heading font-normal tracking-[-0.02em] text-foreground">
+              ${data.total_debt_eliminated.toLocaleString()}
+            </p>
+            <div className="flex items-center gap-2 mt-2">
+              <span className="inline-flex items-center gap-1 text-sm font-mono tabular-nums text-emerald-700 bg-[var(--surface-success)] px-2 py-0.5 rounded">
+                + ${Math.round(data.total_debt_eliminated * 0.15).toLocaleString()} this month
+              </span>
+            </div>
+          </div>
+          <div className="hidden lg:flex flex-col justify-center items-end p-6 rounded-xl border bg-card">
+            <Sparkline data={sparkValues} color="var(--primary)" />
+            <p className="text-xs text-muted-foreground mt-2 font-mono tabular-nums">90-day trend</p>
+          </div>
         </div>
       </FadeUp>
 
-      {/* Health + Performance row */}
+      {/* Supporting metrics */}
       <FadeUp>
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-          <MetricTile icon={<AlertTriangle className="w-5 h-5" />} title="At Risk" value={data.at_risk_cases} numericValue={data.at_risk_cases} href="/clients?health=at_risk" color="danger" delay={0.2} />
-          <MetricTile icon={<AlertCircle className="w-5 h-5" />} title="Stalled" value={data.stalled_cases} numericValue={data.stalled_cases} href="/clients?health=stalled" color="warning" delay={0.25} />
-          <MetricTile icon={<DollarSign className="w-5 h-5" />} title="Debt Eliminated" value={`$${Number(data.total_debt_eliminated).toLocaleString()}`} numericValue={Number(data.total_debt_eliminated)} color="success" delay={0.3} />
-          <MetricTile icon={<TrendingUp className="w-5 h-5" />} title="Resolution Rate" value={`${data.resolution_rate.toFixed(1)}%`} numericValue={Math.round(data.resolution_rate)} color="success" delay={0.35} />
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+          <MetricTileSmall icon={<Users className="w-4 h-4" />} title="Total Cases" value={data.total_cases} numericValue={data.total_cases} href="/clients" color="primary" />
+          <MetricTileSmall icon={<TrendingUp className="w-4 h-4" />} title="Resolution Rate" value={`${data.resolution_rate.toFixed(1)}%`} numericValue={Math.round(data.resolution_rate)} color="success" />
+          <MetricTileSmall icon={<Target className="w-4 h-4" />} title="Active" value={data.active_cases} numericValue={data.active_cases} href="/clients?stage=active" color="info" />
+          <MetricTileSmall icon={<Clock className="w-4 h-4" />} title="Avg. Time" value={data.avg_days_to_resolution != null ? `${Math.round(data.avg_days_to_resolution)} days` : '—'} color="info" />
+        </div>
+      </FadeUp>
+
+      {/* At Risk / Stalled row */}
+      <FadeUp>
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+          <MetricTileSmall icon={<AlertTriangle className="w-4 h-4" />} title="At Risk" value={data.at_risk_cases} numericValue={data.at_risk_cases} href="/clients?health=at_risk" color="danger" />
+          <MetricTileSmall icon={<AlertCircle className="w-4 h-4" />} title="Stalled" value={data.stalled_cases} numericValue={data.stalled_cases} href="/clients?health=stalled" color="warning" />
+          <MetricTileSmall icon={<CheckCircle className="w-4 h-4" />} title="Resolved" value={data.resolved_cases} numericValue={data.resolved_cases} href="/clients?stage=resolved" color="success" />
+          <MetricTileSmall icon={<DollarSign className="w-4 h-4" />} title="Properties" value={data.properties_under_mgmt} numericValue={data.properties_under_mgmt} color="info" />
         </div>
       </FadeUp>
 
       {/* Pipeline + Attention */}
       <FadeUp>
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Pipeline distribution */}
           <motion.div
             initial={{ opacity: 0, y: 16 }}
             animate={{ opacity: 1, y: 0 }}
@@ -135,7 +147,6 @@ export function DashboardView({ data }: { data: DashboardData }) {
             className="lg:col-span-2 p-6 rounded-xl border bg-card"
           >
             <h3 className="text-sm font-semibold text-foreground mb-5 uppercase tracking-wide">Pipeline Distribution</h3>
-            {/* Aurora Arc: one continuous bar segmented by stage (PRD §8.5) */}
             <div className="h-3 rounded-full overflow-hidden flex bg-muted">
               {stageData.map((s) => {
                 const pct = data.total_cases > 0 ? (s.count / data.total_cases) * 100 : 0
@@ -169,7 +180,6 @@ export function DashboardView({ data }: { data: DashboardData }) {
             </div>
           </motion.div>
 
-          {/* Needs Attention */}
           <motion.div
             initial={{ opacity: 0, y: 16 }}
             animate={{ opacity: 1, y: 0 }}

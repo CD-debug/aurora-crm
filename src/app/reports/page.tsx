@@ -1,5 +1,5 @@
 import { getReportData } from '@/lib/data/reports'
-import { NavRail, Breadcrumb } from '@/components/shared'
+import { NavRail, PageHeader } from '@/components/shared'
 import { CountUp } from '@/components/shared/motion'
 
 export const metadata = { title: 'Reports — Aurora CRM' }
@@ -11,13 +11,11 @@ export default async function ReportsPage() {
     <div className="flex min-h-screen bg-background">
       <NavRail />
       <main className="flex-1 ml-16">
-        <header className="border-b border-border bg-background/95 backdrop-blur sticky top-0 z-30">
-          <div className="container mx-auto px-4 py-3">
-            <Breadcrumb items={[{ label: 'Dashboard', href: '/' }, { label: 'Reports' }]} className="mb-1" />
-            <h1 className="text-2xl font-heading font-semibold">Reports</h1>
-            <p className="text-sm text-muted-foreground mt-0.5">Portfolio overview across your entire caseload.</p>
-          </div>
-        </header>
+        <PageHeader
+          title="Reports"
+          subtitle={`${data.totalClients} clients · ${data.totalTasks} tasks · ${data.overdueTasks} overdue`}
+          breadcrumb={[{ label: 'Dashboard', href: '/' }, { label: 'Reports' }]}
+        />
         <div className="container mx-auto px-4 py-6 space-y-6">
 
       <div className="grid gap-4 sm:grid-cols-4">
