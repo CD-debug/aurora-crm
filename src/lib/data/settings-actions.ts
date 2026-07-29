@@ -77,6 +77,10 @@ export async function exportClientsCsv() {
     'resort_name','resort_location','unit_number',
     'purchase_price','loan_balance','maintenance_fee',
     'fee_due_date','document_reference',
+    // Client intake
+    'co_client_name','dob','ssn_last4','address','phone2','retainer_fee',
+    // Property intake
+    'usage_frequency','usage_type','fees_current','fees_behind_amount','maintenance_fees_billed',
   ]
 
   const rows = (clients ?? []).map((c: Record<string, unknown>) => {
@@ -100,6 +104,19 @@ export async function exportClientsCsv() {
       String(p.maintenance_fee ?? ''),
       String(p.fee_due_date ?? ''),
       String(p.document_reference ?? ''),
+      // Client intake fields
+      String(c.co_client_name ?? ''),
+      String(c.dob ?? ''),
+      String(c.ssn_last4 ?? ''),
+      String(c.address ?? ''),
+      String(c.phone2 ?? ''),
+      String(c.retainer_fee ?? ''),
+      // Property intake fields
+      String(p.usage_frequency ?? ''),
+      String(p.usage_type ?? ''),
+      String(p.fees_current ?? ''),
+      String(p.fees_behind_amount ?? ''),
+      String(p.maintenance_fees_billed ?? ''),
     ]
   })
 
@@ -182,6 +199,13 @@ export async function importClientsFromCsv(csvText: string) {
         case_opened_at: row.case_opened_at || null,
         tags,
         author_id: userId,
+        // Intake fields — all optional, only set if header present
+        co_client_name: row.co_client_name?.trim() || null,
+        dob: row.dob || null,
+        ssn_last4: row.ssn_last4?.trim() || null,
+        address: row.address?.trim() || null,
+        phone2: row.phone2?.trim() || null,
+        retainer_fee: row.retainer_fee ? Number(row.retainer_fee) : null,
       })
       .select()
       .single()
@@ -190,6 +214,7 @@ export async function importClientsFromCsv(csvText: string) {
 
     const hasProperty = row.resort_name?.trim() || row.resort_location?.trim()
     if (hasProperty) {
+      const feesCurrent = row.fees_current?.toLowerCase() === 'false' ? false : true
       const { error: propError } = await supabase.from('properties').insert({
         client_id: client.id,
         resort_name: row.resort_name || null,
@@ -200,6 +225,12 @@ export async function importClientsFromCsv(csvText: string) {
         maintenance_fee: row.maintenance_fee ? Number(row.maintenance_fee) : null,
         fee_due_date: row.fee_due_date || null,
         document_reference: row.document_reference || null,
+        // Intake fields
+        usage_frequency: (row.usage_frequency?.trim() || null) as 'annual' | 'biennial' | 'odd_year' | 'even_year' | null,
+        usage_type: (row.usage_type?.trim() || null) as 'fixed_week' | 'floating_week' | 'points_based' | null,
+        fees_current: feesCurrent,
+        fees_behind_amount: row.fees_behind_amount ? Number(row.fees_behind_amount) : null,
+        maintenance_fees_billed: row.maintenance_fees_billed ? Number(row.maintenance_fees_billed) : null,
       })
       if (propError) throw propError
     }

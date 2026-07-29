@@ -20,7 +20,7 @@ import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuIte
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription, SheetFooter } from '@/components/ui/sheet'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog'
-import { NavRail, AuroraArcStepper, ClientHealthBadge, StageBadge } from '@/components/shared'
+import { NavRail, AuroraArcStepper, ClientHealthBadge, StageBadge, PhoneInput, SsnInput, CurrencyInput } from '@/components/shared'
 import { createClient } from '@/lib/supabase/client'
 import { fetchClients, invalidateAfterMutation } from '@/lib/data/client-queries'
 import { queryKeys } from '@/lib/data/query-keys'
@@ -33,7 +33,10 @@ import { cn } from '@/lib/utils'
 const SORTABLE = ['name', 'state', 'zip', 'email', 'health_status', 'stage', 'last_contact_at'] as const
 type SortKey = (typeof SORTABLE)[number]
 
-const EMPTY_FORM = { name: '', phone: '', email: '', state: '', zip: '', tags: '' }
+const EMPTY_FORM = {
+  name: '', phone: '', email: '', state: '', zip: '', tags: '',
+  co_client_name: '', dob: '', ssn_last4: '', address: '', phone2: '', retainer_fee: '',
+}
 
 function ClientsPageContent() {
   const router = useRouter()
@@ -105,6 +108,12 @@ function ClientsPageContent() {
           state: form.state,
           zip: form.zip,
           tags: form.tags ? form.tags.split(',').map((t) => t.trim()).filter(Boolean) : [],
+          co_client_name: form.co_client_name.trim() || null,
+          dob: form.dob || null,
+          ssn_last4: form.ssn_last4 || null,
+          address: form.address.trim() || null,
+          phone2: form.phone2.trim() || null,
+          retainer_fee: form.retainer_fee ? Number(form.retainer_fee.replace(/,/g, '')) : null,
         },
         { allowDuplicate }
       )
@@ -381,8 +390,30 @@ function ClientsPageContent() {
                   <Input id="nc-name" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required />
                 </div>
                 <div className="space-y-2">
+                  <label className="text-sm font-medium" htmlFor="nc-coclient">Co-Client</label>
+                  <Input id="nc-coclient" value={form.co_client_name} onChange={(e) => setForm({ ...form, co_client_name: e.target.value })} placeholder="Second client on the case" />
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium" htmlFor="nc-dob">Date of Birth</label>
+                    <Input id="nc-dob" type="date" value={form.dob} onChange={(e) => setForm({ ...form, dob: e.target.value })} />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium" htmlFor="nc-ssn">Last 4 of SSN</label>
+                    <SsnInput value={form.ssn_last4} onChange={(v) => setForm({ ...form, ssn_last4: v })} />
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <label className="text-sm font-medium" htmlFor="nc-address">Address</label>
+                  <Input id="nc-address" value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} placeholder="Street, City" />
+                </div>
+                <div className="space-y-2">
                   <label className="text-sm font-medium" htmlFor="nc-phone">Phone *</label>
-                  <Input id="nc-phone" type="tel" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} required />
+                  <PhoneInput value={form.phone} onChange={(v) => setForm({ ...form, phone: v })} required />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-sm font-medium" htmlFor="nc-phone2">Phone (2)</label>
+                  <PhoneInput value={form.phone2} onChange={(v) => setForm({ ...form, phone2: v })} />
                 </div>
                 <div className="space-y-2">
                   <label className="text-sm font-medium" htmlFor="nc-email">Email *</label>
@@ -397,6 +428,10 @@ function ClientsPageContent() {
                     <label className="text-sm font-medium" htmlFor="nc-zip">ZIP *</label>
                     <Input id="nc-zip" value={form.zip} onChange={(e) => setForm({ ...form, zip: e.target.value })} required maxLength={10} />
                   </div>
+                </div>
+                <div className="space-y-2">
+                  <label className="text-sm font-medium" htmlFor="nc-retainer">Retainer Fee</label>
+                  <CurrencyInput value={form.retainer_fee} onChange={(v) => setForm({ ...form, retainer_fee: v })} />
                 </div>
                 <div className="space-y-2">
                   <label className="text-sm font-medium" htmlFor="nc-tags">Tags</label>

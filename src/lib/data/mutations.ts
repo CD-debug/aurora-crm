@@ -111,6 +111,13 @@ const propertyInput = z.object({
   loan_balance: money,
   maintenance_fee: money,
   fee_due_date: z.iso.date().nullable().optional(),
+  // Intake fields — optional (existing properties have nulls)
+  usage_frequency: z.enum(['annual', 'biennial', 'odd_year', 'even_year']).nullable().optional(),
+  usage_type: z.enum(['fixed_week', 'floating_week', 'points_based']).nullable().optional(),
+  fees_current: z.boolean().optional(),
+  fees_behind_amount: money,
+  maintenance_fees_billed: money,
+  status: z.enum(['active', 'paid_off']).optional(),
   document_reference: z
     .string()
     .trim()

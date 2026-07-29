@@ -1,4 +1,4 @@
--- ============================================================
+a-- ============================================================
 -- Aurora CRM — Combined Migration (run once in Supabase SQL Editor)
 -- Paste this entire file into https://supabase.com/dashboard/project/zkjytbnalmzmfxjkrhmn/sql
 -- ============================================================

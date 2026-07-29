@@ -87,10 +87,14 @@ const CLIENTS = [
     state: 'FL', zip: '33602', stage: 'resolved',
     stage_entered_at: daysAgo(45), case_opened_at: daysAgo(395),
     resolved_at: daysAgo(45), tags: ['VIP'],
+    co_client_name: 'Robert Harding', dob: '1962-04-18', ssn_last4: '4521',
+    address: '2841 Bayshore Blvd, Tampa, FL 33611', phone2: '8135550199', retainer_fee: 3500,
     properties: [
       { resort_name: 'Marriott Grand Vista', resort_location: 'Orlando, FL',
         unit_number: '412-B', purchase_price: 42000, loan_balance: 0,
         paid_off: true, value_eliminated: 42000, status: 'paid_off',
+        usage_frequency: 'annual', usage_type: 'fixed_week',
+        fees_current: true, maintenance_fees_billed: 24000,
         document_reference: 'https://docs.example.com/harding-contract.pdf' },
     ],
   },
@@ -102,7 +106,9 @@ const CLIENTS = [
     properties: [
       { resort_name: 'Westgate Las Vegas Resort', resort_location: 'Las Vegas, NV',
         purchase_price: 29500, loan_balance: 0,
-        paid_off: true, value_eliminated: 29500, status: 'paid_off' },
+        paid_off: true, value_eliminated: 29500, status: 'paid_off',
+        usage_frequency: 'odd_year', usage_type: 'floating_week',
+        fees_current: true, maintenance_fees_billed: 14800 },
     ],
   },
   // In progress — featured case for "big win pending"
@@ -110,10 +116,14 @@ const CLIENTS = [
     name: 'Patricia Kelley', phone: '3055550123', email: 'patricia.kelley@example.com',
     state: 'FL', zip: '33139', stage: 'in_progress',
     stage_entered_at: daysAgo(58), case_opened_at: daysAgo(220), tags: ['VIP', 'Mortgage'],
+    co_client_name: 'James Kelley', dob: '1971-09-03', ssn_last4: '8801',
+    address: '1234 Ocean Dr, Miami Beach, FL 33139', phone2: '3055550124', retainer_fee: 4500,
     properties: [
       { resort_name: 'Wyndham Grand Clearwater', resort_location: 'Clearwater, FL',
         unit_number: '1808', purchase_price: 85500, loan_balance: 62000,
         maintenance_fee: 1450, fee_due_date: daysFromNow(22),
+        usage_frequency: 'annual', usage_type: 'points_based',
+        fees_current: true, maintenance_fees_billed: 43500,
         document_reference: 'https://docs.example.com/kelley-deed.pdf' },
     ],
   },
@@ -124,17 +134,23 @@ const CLIENTS = [
     properties: [
       { resort_name: 'Diamond Resorts Scottsdale', resort_location: 'Scottsdale, AZ',
         purchase_price: 35000, loan_balance: 28000, maintenance_fee: 980,
-        fee_due_date: daysFromNow(14) },
+        fee_due_date: daysFromNow(14),
+        usage_frequency: 'biennial', usage_type: 'points_based',
+        fees_current: false, fees_behind_amount: 1960, maintenance_fees_billed: 7840 },
     ],
   },
   {
     name: 'Sandy Bachman', phone: '4075550188', email: 'sandy.bachman@example.com',
     state: 'FL', zip: '32801', stage: 'in_progress',
     stage_entered_at: daysAgo(75), case_opened_at: daysAgo(190), tags: ['Mortgage'],
+    co_client_name: 'Tom Bachman', dob: '1958-11-22', ssn_last4: '7234',
+    address: '450 Vineland Rd, Orlando, FL 32811', phone2: '4075550189', retainer_fee: 2750,
     properties: [
       { resort_name: 'Hyatt Regency Coconut Point', resort_location: 'Bonita Springs, FL',
         purchase_price: 51500, loan_balance: 38000, maintenance_fee: 1250,
-        fee_due_date: daysFromNow(7) },
+        fee_due_date: daysFromNow(7),
+        usage_frequency: 'annual', usage_type: 'floating_week',
+        fees_current: true, maintenance_fees_billed: 18750 },
     ],
   },
   // Exit Plan stage
@@ -145,7 +161,9 @@ const CLIENTS = [
     properties: [
       { resort_name: 'Bluegreen Resorts Carolina Pkwy', resort_location: 'Pinehurst, NC',
         purchase_price: 22000, loan_balance: 17500, maintenance_fee: 720,
-        fee_due_date: daysFromNow(45) },
+        fee_due_date: daysFromNow(45),
+        usage_frequency: 'even_year', usage_type: 'fixed_week',
+        fees_current: true, maintenance_fees_billed: 6480 },
     ],
   },
   {
@@ -155,7 +173,9 @@ const CLIENTS = [
     properties: [
       { resort_name: 'Marriott Harbour Point', resort_location: 'Tampa, FL',
         purchase_price: 33000, loan_balance: 24500, maintenance_fee: 980,
-        fee_due_date: daysFromNow(5) },
+        fee_due_date: daysFromNow(5),
+        usage_frequency: 'annual', usage_type: 'points_based',
+        fees_current: true, maintenance_fees_billed: 14700 },
     ],
   },
   // Consultation (newest leads)
@@ -211,6 +231,13 @@ async function insertClients() {
     stage: c.stage, stage_entered_at: c.stage_entered_at,
     case_opened_at: c.case_opened_at, resolved_at: c.resolved_at ?? null,
     tags: c.tags, author_id: demoUserId,
+    // Intake fields — populated on a few clients to demonstrate the new form
+    co_client_name: c.co_client_name ?? null,
+    dob: c.dob ?? null,
+    ssn_last4: c.ssn_last4 ?? null,
+    address: c.address ?? null,
+    phone2: c.phone2 ?? null,
+    retainer_fee: c.retainer_fee ?? null,
   }))
   const { data, error } = await db.from('clients').insert(clientRows).select('id, name')
   if (error) throw error
@@ -236,6 +263,12 @@ async function insertProperties(insertedClients) {
         paid_off_at: p.paid_off ? daysAgo(30) : null,
         document_reference: p.document_reference ?? null,
         value_eliminated: p.paid_off ? (p.value_eliminated ?? p.loan_balance ?? null) : null,
+        // Intake fields
+        usage_frequency: p.usage_frequency ?? null,
+        usage_type: p.usage_type ?? null,
+        fees_current: p.fees_current ?? true,
+        fees_behind_amount: p.fees_behind_amount ?? null,
+        maintenance_fees_billed: p.maintenance_fees_billed ?? null,
       })
     }
   }

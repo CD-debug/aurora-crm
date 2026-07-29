@@ -25,6 +25,13 @@ export interface Client {
   tags: string[]
   created_at: string
   updated_at: string
+  // Intake fields (20260727 migration) — nullable; filled over time, never required
+  dob: string | null
+  ssn_last4: string | null
+  co_client_name: string | null
+  address: string | null
+  phone2: string | null
+  retainer_fee: number | null
 }
 
 /** Row of the clients_with_health view: Client + computed fields. */
@@ -52,6 +59,12 @@ export interface Property {
   value_eliminated: number | null
   created_at: string
   updated_at: string
+  // Intake fields (20260727 migration) — nullable
+  usage_frequency: 'annual' | 'biennial' | 'odd_year' | 'even_year' | null
+  usage_type: 'fixed_week' | 'floating_week' | 'points_based' | null
+  fees_current: boolean
+  fees_behind_amount: number | null
+  maintenance_fees_billed: number | null
 }
 
 export interface Note {
