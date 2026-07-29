@@ -1,6 +1,6 @@
 'use client'
 
-import { motion, useMotionValue, useTransform, animate, type Variants } from 'framer-motion'
+import { motion, type Variants } from 'framer-motion'
 import { useEffect, useRef, useState } from 'react'
 
 // ─── Page entrance: staggered children ───────────────────────────────────────

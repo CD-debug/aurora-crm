@@ -16,13 +16,19 @@ export default async function DashboardPage() {
     data = null
   }
 
+  const subtitle = !data
+    ? ''
+    : data.total_cases === 0
+      ? 'Welcome to Aurora — your portfolio starts here.'
+      : `$${data.total_debt_eliminated.toLocaleString()} eliminated across ${data.total_cases} cases · ${data.properties_under_mgmt} properties under management`
+
   return (
     <div className="flex min-h-screen bg-background">
       <NavRail />
       <main className="flex-1 ml-16 overflow-auto">
         <PageHeader
           title="Overview"
-          subtitle={data ? `$${data.total_debt_eliminated.toLocaleString()} eliminated across ${data.total_cases} cases · ${data.properties_under_mgmt} properties under management` : ''}
+          subtitle={subtitle}
           breadcrumb={[{ label: 'Overview' }]}
         />
         <div className="container mx-auto px-4 py-6">

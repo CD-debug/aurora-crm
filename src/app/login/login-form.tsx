@@ -19,7 +19,8 @@ export default function LoginForm() {
   const [loading, setLoading] = useState(false)
   const supabase = createClient()
 
-  const redirectTo = searchParams.get('redirectTo') || '/'
+  const rawRedirect = searchParams.get('redirectTo') || '/'
+  const redirectTo = rawRedirect.startsWith('/') && !rawRedirect.startsWith('//') ? rawRedirect : '/'
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()

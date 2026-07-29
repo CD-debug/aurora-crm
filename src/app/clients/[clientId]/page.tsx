@@ -6,7 +6,7 @@
 // fetches the whole workspace; every mutation invalidates the shared keys
 // so the Tasks page and directory stay in sync (PRD §7.4).
 
-import { useMemo, useState, useEffect } from 'react'
+import { useState, useEffect } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { format, parseISO } from 'date-fns'
@@ -36,7 +36,7 @@ import {
 import {
   daysSince, financialProgress, isDueSoon, stagePercent, taskStatus, STAGE_LABELS,
 } from '@/lib/data/domain'
-import type { NoteChannel, PipelineStage, Property, TeamMember } from '@/lib/data/types'
+import type { NoteChannel, PipelineStage, Property } from '@/lib/data/types'
 import { cn } from '@/lib/utils'
 
 const CHANNEL_META: Record<NoteChannel, { label: string; icon: typeof Mail }> = {
@@ -376,7 +376,7 @@ export default function Client360Page() {
         email: editForm.email,
         state: editForm.state,
         zip: editForm.zip,
-        tags: editForm.tags ? editForm.tags.split(',').map((t) => t.trim()).filter(Boolean) : [],
+        tags: editForm.tags ? editForm.tags.split(/[,;]/).map((t) => t.trim()).filter(Boolean) : [],
         co_client_name: editForm.co_client_name.trim() || null,
         dob: editForm.dob || null,
         ssn_last4: editForm.ssn_last4 || null,
@@ -1141,7 +1141,7 @@ export default function Client360Page() {
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <label className="text-sm font-medium">Date of Birth</label>
-                  <Input type="date" value={editForm.dob} onChange={(e) => setEditForm({ ...editForm, dob: e.target.value })} />
+                  <Input type="date" max={new Date().toISOString().split('T')[0]} value={editForm.dob} onChange={(e) => setEditForm({ ...editForm, dob: e.target.value })} />
                 </div>
                 <div className="space-y-2">
                   <label className="text-sm font-medium">Last 4 of SSN</label>

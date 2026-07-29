@@ -13,7 +13,7 @@ export async function getDashboardData(): Promise<DashboardData> {
     supabase
       .from('clients_with_health')
       .select('id, name, stage, health_status, case_opened_at, resolved_at, last_contact_at, overdue_task_count'),
-    supabase.from('properties').select('status, value_eliminated, loan_balance'),
+    supabase.from('properties').select('status, value_eliminated, loan_balance, paid_off_at'),
   ])
 
   if (clientsRes.error) throw new Error(`Couldn't load dashboard metrics: ${clientsRes.error.message}`)
@@ -25,7 +25,7 @@ export async function getDashboardData(): Promise<DashboardData> {
       'id' | 'name' | 'stage' | 'health_status' | 'case_opened_at' | 'resolved_at' | 'last_contact_at' | 'overdue_task_count'
     >
   >
-  const properties = propsRes.data as Array<Pick<Property, 'status' | 'value_eliminated' | 'loan_balance'>>
+  const properties = propsRes.data as Array<Pick<Property, 'status' | 'value_eliminated' | 'loan_balance' | 'paid_off_at'>>
 
   const stage_counts = Object.fromEntries(STAGES.map((s) => [s, 0])) as Record<PipelineStage, number>
   for (const c of clients) stage_counts[c.stage] += 1
@@ -43,15 +43,26 @@ export async function getDashboardData(): Promise<DashboardData> {
         (24 * 60 * 60 * 1000)
       : null
 
+  // Real "this month" debt eliminated — sum paid-off properties where paid_off_at is in the trailing 30 days
+  const now = Date.now()
+  const thirtyDaysMs = 30 * 24 * 60 * 60 * 1000
+  const paidOffProps = properties.filter((p) => p.status === 'paid_off')
+  const total_debt_eliminated = paidOffProps.reduce(
+    (sum, p) => sum + Number(p.value_eliminated ?? p.loan_balance ?? 0),
+    0,
+  )
+  const this_month_debt_eliminated = paidOffProps
+    .filter((p) => p.paid_off_at && now - new Date(p.paid_off_at).getTime() <= thirtyDaysMs)
+    .reduce((sum, p) => sum + Number(p.value_eliminated ?? p.loan_balance ?? 0), 0)
+
   return {
     total_cases: clients.length,
     active_cases: clients.filter((c) => c.stage !== 'resolved').length,
     at_risk_cases: clients.filter((c) => c.health_status === 'at_risk').length,
     stalled_cases: clients.filter((c) => c.health_status === 'stalled').length,
     resolved_cases: resolved.length,
-    total_debt_eliminated: properties
-      .filter((p) => p.status === 'paid_off')
-      .reduce((sum, p) => sum + Number(p.value_eliminated ?? p.loan_balance ?? 0), 0),
+    total_debt_eliminated,
+    this_month_debt_eliminated,
     properties_under_mgmt: properties.filter((p) => p.status === 'active').length,
     avg_days_to_resolution: avgDays,
     resolution_rate: clients.length > 0 ? (resolved.length / clients.length) * 100 : 0,
@@ -70,3 +81,4 @@ export async function getDashboardData(): Promise<DashboardData> {
       })),
   }
 }
+

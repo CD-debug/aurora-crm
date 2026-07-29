@@ -1,3 +1,4 @@
+import Link from 'next/link'
 import { getReportData } from '@/lib/data/reports'
 import { NavRail, PageHeader } from '@/components/shared'
 import { CountUp } from '@/components/shared/motion'
@@ -5,7 +6,18 @@ import { CountUp } from '@/components/shared/motion'
 export const metadata = { title: 'Reports — Aurora CRM' }
 
 export default async function ReportsPage() {
-  const data = await getReportData()
+  let data
+  try {
+    data = await getReportData()
+  } catch {
+    data = null
+  }
+
+  const subtitle = data
+    ? data.totalClients === 0
+      ? 'Add your first client to populate reports.'
+      : `${data.totalClients} client${data.totalClients !== 1 ? 's' : ''} · ${data.totalTasks} task${data.totalTasks !== 1 ? 's' : ''} · ${data.overdueTasks} overdue`
+    : ''
 
   return (
     <div className="flex min-h-screen bg-background">
@@ -13,106 +25,129 @@ export default async function ReportsPage() {
       <main className="flex-1 ml-16">
         <PageHeader
           title="Reports"
-          subtitle={`${data.totalClients} clients · ${data.totalTasks} tasks · ${data.overdueTasks} overdue`}
+          subtitle={subtitle}
           breadcrumb={[{ label: 'Dashboard', href: '/' }, { label: 'Reports' }]}
         />
         <div className="container mx-auto px-4 py-6 space-y-6">
 
-      <div className="grid gap-4 sm:grid-cols-4">
-        <StatCard label="Total Clients" value={data.totalClients} />
-        <StatCard label="Total Tasks" value={data.totalTasks} />
-        <StatCard label="Overdue Tasks" value={data.overdueTasks} warn={data.overdueTasks > 0} />
-        <StatCard label="Completed Tasks" value={data.completedTasks} />
-      </div>
-
-      <div className="grid gap-6 lg:grid-cols-2">
-        <Section title="Clients by Stage">
-          {data.byStage.map(s => (
-            <BarRow key={s.stage} label={s.stage} value={s.count} max={Math.max(data.totalClients, 1)} />
-          ))}
-        </Section>
-
-        <Section title="Clients by Health">
-          {data.byHealth.map(h => (
-            <BarRow key={h.label} label={h.label} value={h.count} max={Math.max(data.totalClients, 1)} color={h.color} />
-          ))}
-        </Section>
-
-        <Section title="Top 10 States">
-          {data.byState?.length === 0 ? (
-            <p className="text-sm text-muted-foreground py-2">No data yet.</p>
-          ) : (
-            data.byState.map(s => (
-              <BarRow key={s.state} label={s.state} value={s.count} max={Math.max(data.totalClients, 1)} />
-            ))
-          )}
-        </Section>
-
-        <Section title="Properties">
-          <div className="space-y-2.5 text-sm">
-            <div className="flex justify-between"><span className="text-muted-foreground">Active</span>
-              <span className="font-mono tabular-nums font-medium">{data.activeProperties}</span></div>
-            <div className="flex justify-between"><span className="text-muted-foreground">Paid Off</span>
-              <span className="font-mono tabular-nums font-medium">{data.paidOffProperties}</span></div>
-            <div className="flex justify-between"><span className="text-muted-foreground">Total purchase price</span>
-              <span className="font-mono tabular-nums font-medium">${data.totalPurchasePrice.toLocaleString()}</span></div>
-            <div className="flex justify-between"><span className="text-muted-foreground">Total loan balance</span>
-              <span className="font-mono tabular-nums font-medium">${data.totalLoanBalance.toLocaleString()}</span></div>
-          </div>
-        </Section>
-
-        <Section title="Team Activity">
-          {data.teamActivity.length === 0 ? (
-            <p className="text-sm text-muted-foreground py-2">
-              No team members yet. Add names in <span className="font-medium">Settings → Team Members</span> to see per-member activity here.
-            </p>
-          ) : (
-            <div className="space-y-3">
-              {data.teamActivity.map((m) => {
-                const total = m.tasksTotal + m.notes
-                return (
-                  <div key={m.id} className="space-y-1.5">
-                    <div className="flex items-center justify-between text-sm">
-                      <span className="font-medium">{m.name}</span>
-                      <span className="text-xs text-muted-foreground font-mono tabular-nums">
-                        {m.notes} note{m.notes !== 1 ? 's' : ''} · {m.tasksCompleted}/{m.tasksTotal} task{m.tasksTotal !== 1 ? 's' : ''}
-                      </span>
-                    </div>
-                    {total > 0 && (
-                      <div className="flex gap-1 h-2 rounded-full overflow-hidden bg-muted">
-                        {m.tasksTotal > 0 && (
-                          <div
-                            className="h-full bg-primary"
-                            style={{ width: `${(m.tasksTotal / total) * 100}%` }}
-                            title={`${m.tasksTotal} task${m.tasksTotal !== 1 ? 's' : ''} (${m.tasksCompleted} done)`}
-                          />
-                        )}
-                        {m.notes > 0 && (
-                          <div
-                            className="h-full bg-chart-2"
-                            style={{ width: `${(m.notes / total) * 100}%` }}
-                            title={`${m.notes} note${m.notes !== 1 ? 's' : ''}`}
-                          />
-                        )}
-                      </div>
-                    )}
-                  </div>
-                )
-              })}
-              {(data.unassignedActivity.notes > 0 || data.unassignedActivity.tasksTotal > 0) && (
-                <div className="space-y-1.5 pt-2 border-t">
-                  <div className="flex items-center justify-between text-sm">
-                    <span className="text-muted-foreground italic">Unassigned</span>
-                    <span className="text-xs text-muted-foreground font-mono tabular-nums">
-                      {data.unassignedActivity.notes} note{data.unassignedActivity.notes !== 1 ? 's' : ''} · {data.unassignedActivity.tasksCompleted}/{data.unassignedActivity.tasksTotal} task{data.unassignedActivity.tasksTotal !== 1 ? 's' : ''}
-                    </span>
-                  </div>
-                </div>
-              )}
+          {data === null ? (
+            <div className="rounded-xl border bg-card p-12 text-center">
+              <p className="text-muted-foreground">Couldn&apos;t load reports. Make sure you&apos;re signed in and try again.</p>
+              <Link href="/" className="mt-4 inline-block text-primary hover:underline">Back to dashboard</Link>
             </div>
+          ) : data.totalClients === 0 ? (
+            <div className="rounded-xl border bg-card p-12 text-center">
+              <p className="font-heading text-lg mb-1">No data yet</p>
+              <p className="text-sm text-muted-foreground mb-5">Reports populate as you add clients, tasks, and properties.</p>
+              <Link href="/clients" className="text-primary hover:underline text-sm font-medium">Go to Clients →</Link>
+            </div>
+          ) : (
+            <>
+              <div className="grid gap-4 sm:grid-cols-4">
+                <StatCard label="Total Clients" value={data.totalClients} />
+                <StatCard label="Total Tasks" value={data.totalTasks} />
+                <StatCard label="Overdue Tasks" value={data.overdueTasks} warn={data.overdueTasks > 0} />
+                <StatCard label="Completed Tasks" value={data.completedTasks} />
+              </div>
+
+              <div className="grid gap-6 lg:grid-cols-2">
+                <Section title="Clients by Stage">
+                  {data.byStage.length === 0 ? (
+                    <p className="text-sm text-muted-foreground py-2">No stages yet.</p>
+                  ) : (
+                    data.byStage.map(s => (
+                      <BarRow key={s.stage} label={s.stage} value={s.count} max={data.totalClients} />
+                    ))
+                  )}
+                </Section>
+
+                <Section title="Clients by Health">
+                  {data.byHealth.length === 0 ? (
+                    <p className="text-sm text-muted-foreground py-2">No health data yet.</p>
+                  ) : (
+                    data.byHealth.map(h => (
+                      <BarRow key={h.label} label={h.label} value={h.count} max={data.totalClients} color={h.color} />
+                    ))
+                  )}
+                </Section>
+
+                <Section title="Top 10 States">
+                  {data.byState.length === 0 ? (
+                    <p className="text-sm text-muted-foreground py-2">No clients with state set yet.</p>
+                  ) : (
+                    data.byState.map(s => (
+                      <BarRow key={s.state} label={s.state} value={s.count} max={data.totalClients} />
+                    ))
+                  )}
+                </Section>
+
+                <Section title="Properties">
+                  <div className="space-y-2.5 text-sm">
+                    <div className="flex justify-between"><span className="text-muted-foreground">Active</span>
+                      <span className="font-mono tabular-nums font-medium">{data.activeProperties}</span></div>
+                    <div className="flex justify-between"><span className="text-muted-foreground">Paid Off</span>
+                      <span className="font-mono tabular-nums font-medium">{data.paidOffProperties}</span></div>
+                    <div className="flex justify-between"><span className="text-muted-foreground">Total purchase price</span>
+                      <span className="font-mono tabular-nums font-medium">${data.totalPurchasePrice.toLocaleString()}</span></div>
+                    <div className="flex justify-between"><span className="text-muted-foreground">Total loan balance</span>
+                      <span className="font-mono tabular-nums font-medium">${data.totalLoanBalance.toLocaleString()}</span></div>
+                  </div>
+                </Section>
+
+                <Section title="Team Activity">
+                  {data.teamActivity.length === 0 ? (
+                    <p className="text-sm text-muted-foreground py-2">
+                      No team members yet. Add names in <span className="font-medium">Settings → Team Members</span> to see per-member activity here.
+                    </p>
+                  ) : (
+                    <div className="space-y-3">
+                      {data.teamActivity.map((m) => {
+                        const total = m.tasksTotal + m.notes
+                        return (
+                          <div key={m.id} className="space-y-1.5">
+                            <div className="flex items-center justify-between text-sm">
+                              <span className="font-medium">{m.name}</span>
+                              <span className="text-xs text-muted-foreground font-mono tabular-nums">
+                                {m.notes} note{m.notes !== 1 ? 's' : ''} · {m.tasksCompleted}/{m.tasksTotal} task{m.tasksTotal !== 1 ? 's' : ''}
+                              </span>
+                            </div>
+                            {total > 0 && (
+                              <div className="flex gap-1 h-2 rounded-full overflow-hidden bg-muted">
+                                {m.tasksTotal > 0 && (
+                                  <div
+                                    className="h-full bg-primary"
+                                    style={{ width: `${(m.tasksTotal / total) * 100}%` }}
+                                    title={`${m.tasksTotal} task${m.tasksTotal !== 1 ? 's' : ''} (${m.tasksCompleted} done)`}
+                                  />
+                                )}
+                                {m.notes > 0 && (
+                                  <div
+                                    className="h-full bg-chart-2"
+                                    style={{ width: `${(m.notes / total) * 100}%` }}
+                                    title={`${m.notes} note${m.notes !== 1 ? 's' : ''}`}
+                                  />
+                                )}
+                              </div>
+                            )}
+                          </div>
+                        )
+                      })}
+                      {(data.unassignedActivity.notes > 0 || data.unassignedActivity.tasksTotal > 0) && (
+                        <div className="space-y-1.5 pt-2 border-t">
+                          <div className="flex items-center justify-between text-sm">
+                            <span className="text-muted-foreground italic">Unassigned</span>
+                            <span className="text-xs text-muted-foreground font-mono tabular-nums">
+                              {data.unassignedActivity.notes} note{data.unassignedActivity.notes !== 1 ? 's' : ''} · {data.unassignedActivity.tasksCompleted}/{data.unassignedActivity.tasksTotal} task{data.unassignedActivity.tasksTotal !== 1 ? 's' : ''}
+                            </span>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </Section>
+              </div>
+            </>
           )}
-        </Section>
-        </div>
         </div>
       </main>
     </div>
