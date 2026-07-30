@@ -3,9 +3,8 @@
 import { useState, useRef, useCallback } from 'react'
 import { exportClientsCsv, importClientsFromCsv } from '@/lib/data/settings-actions'
 import { toast } from 'sonner'
-import { Download, Upload, FileText, Loader2, CheckCircle, XCircle, AlertTriangle, Eye } from 'lucide-react'
+import { Download, Upload, FileText, Loader2, CheckCircle, XCircle, AlertTriangle, Eye, X } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog'
 import { cn } from '@/lib/utils'
 
 const CSV_TEMPLATE_HEADERS = [
@@ -219,45 +218,74 @@ function SeeHowDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (op
   const [activeTab, setActiveTab] = useState<'example' | 'reference'>('example')
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-3xl max-h-[85vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle>CSV Import — See How It Works</DialogTitle>
-          <DialogDescription>
-            Two tabs: an annotated example CSV and the complete field reference.
-          </DialogDescription>
-        </DialogHeader>
-        <div className="grid grid-cols-2 gap-1 mt-4 rounded-lg bg-muted p-1">
-          <button
-            onClick={() => setActiveTab('example')}
-            className={cn(
-              'inline-flex items-center justify-center gap-2 rounded-md px-3 py-1.5 text-sm font-medium transition-colors',
-              activeTab === 'example'
-                ? 'bg-background text-foreground shadow-sm'
-                : 'text-muted-foreground hover:text-foreground'
-            )}
+    <AnimatePresence>
+      {open && (
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          className="fixed inset-0 z-50 isolate flex items-center justify-center p-4"
+        >
+          <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={() => onOpenChange(false)} />
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95, y: 10 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.95, y: 10 }}
+            transition={{ duration: 0.15 }}
+            className="relative w-full max-w-3xl max-h-[85vh] overflow-y-auto rounded-xl bg-popover p-4 text-popover-foreground ring-1 ring-foreground/10"
+            role="dialog"
+            aria-modal="true"
+            aria-label="CSV Import — See How It Works"
           >
-            <Eye className="w-4 h-4" />
-            Example CSV
-          </button>
-          <button
-            onClick={() => setActiveTab('reference')}
-            className={cn(
-              'inline-flex items-center justify-center gap-2 rounded-md px-3 py-1.5 text-sm font-medium transition-colors',
-              activeTab === 'reference'
-                ? 'bg-background text-foreground shadow-sm'
-                : 'text-muted-foreground hover:text-foreground'
-            )}
-          >
-            <FileText className="w-4 h-4" />
-            Field Reference
-          </button>
-        </div>
-        <div className="mt-4">
-          {activeTab === 'example' ? <ExampleCsvTab /> : <FieldReferenceTab />}
-        </div>
-      </DialogContent>
-    </Dialog>
+            <button
+              onClick={() => onOpenChange(false)}
+              className="absolute top-2 right-2 inline-flex items-center justify-center w-7 h-7 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+              aria-label="Close"
+            >
+              <X className="w-4 h-4" />
+            </button>
+
+            <div className="mb-4">
+              <h2 className="text-base font-heading font-medium">CSV Import — See How It Works</h2>
+              <p className="text-sm text-muted-foreground mt-1">
+                Two tabs: an annotated example CSV and the complete field reference.
+              </p>
+            </div>
+
+            <div className="grid grid-cols-2 gap-1 rounded-lg bg-muted p-1">
+              <button
+                onClick={() => setActiveTab('example')}
+                className={cn(
+                  'inline-flex items-center justify-center gap-2 rounded-md px-3 py-1.5 text-sm font-medium transition-colors',
+                  activeTab === 'example'
+                    ? 'bg-background text-foreground shadow-sm'
+                    : 'text-muted-foreground hover:text-foreground'
+                )}
+              >
+                <Eye className="w-4 h-4" />
+                Example CSV
+              </button>
+              <button
+                onClick={() => setActiveTab('reference')}
+                className={cn(
+                  'inline-flex items-center justify-center gap-2 rounded-md px-3 py-1.5 text-sm font-medium transition-colors',
+                  activeTab === 'reference'
+                    ? 'bg-background text-foreground shadow-sm'
+                    : 'text-muted-foreground hover:text-foreground'
+                )}
+              >
+                <FileText className="w-4 h-4" />
+                Field Reference
+              </button>
+            </div>
+
+            <div className="mt-4">
+              {activeTab === 'example' ? <ExampleCsvTab /> : <FieldReferenceTab />}
+            </div>
+          </motion.div>
+        </motion.div>
+      )}
+    </AnimatePresence>
   )
 }
 
