@@ -14,7 +14,7 @@ import { toast } from 'sonner'
 import { motion } from 'framer-motion'
 import { ActivityTimeline } from '@/components/shared/ActivityTimeline'
 import {
-  Calendar, Clock, DollarSign, Home, AlertTriangle, CheckCircle, Plus, Trash2,
+  Calendar, Clock, Home, AlertTriangle, CheckCircle, Plus, Trash2,
   Mail, Phone, MessageSquare, FileText, Building2, Target, TrendingUp, Pencil,
   CalendarClock, FileWarning, Percent, CalendarDays, Shield, MapPin, UserCircle, Pin, Save, X,
 } from 'lucide-react'
@@ -34,7 +34,7 @@ import {
   createTask, setTaskCompleted, deleteTask, updateClientStage, updateClient,
 } from '@/lib/data/mutations'
 import {
-  daysSince, financialProgress, isDueSoon, stagePercent, taskStatus, STAGE_LABELS,
+  daysSince, maintenanceProjection, isDueSoon, stagePercent, taskStatus, STAGE_LABELS,
 } from '@/lib/data/domain'
 import type { NoteChannel, PipelineStage, Property } from '@/lib/data/types'
 import { cn } from '@/lib/utils'
@@ -428,10 +428,8 @@ export default function Client360Page() {
   }
 
   const { client, properties, notes, tasks } = data
-  const fin = financialProgress(properties)
   const openTasks = tasks.filter((t) => !t.completed_at)
   const overdueTasks = openTasks.filter((t) => taskStatus(t) === 'overdue')
-  const docsMissing = properties.filter((p) => !p.document_reference).length
   const nextFeeDue = properties
     .filter((p) => p.status === 'active' && p.fee_due_date)
     .map((p) => p.fee_due_date!)
@@ -574,42 +572,121 @@ export default function Client360Page() {
                   /></motion.div>
                 </motion.div>
 
-                {/* Amount owed vs. eliminated (PRD §11.1) */}
-                <div className="mt-6">
-                  <div className="flex items-center justify-between text-sm mb-2">
-                    <span className="font-medium flex items-center gap-1.5">
-                      <DollarSign className="w-4 h-4 text-muted-foreground" />
-                      Owed vs. Eliminated
+                {/* 10-Year Maintenance Fee Projection */}
+                <motion.div
+                  initial={{ opacity: 0, y: 12 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1], delay: 0.4 }}
+                  className="mt-6 rounded-lg border bg-gradient-to-br from-card via-card to-muted/20 p-5"
+                >
+                  <div className="flex items-center justify-between mb-4">
+                    <div className="flex items-center gap-2">
+                      <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-primary/10 text-primary">
+                        <TrendingUp className="w-4 h-4" />
+                      </div>
+                      <div>
+                        <h3 className="text-sm font-semibold">Maintenance Fees</h3>
+                        <p className="text-[11px] text-muted-foreground">10-Year Projection</p>
+                      </div>
+                    </div>
+                    <span className="text-[11px] font-medium text-muted-foreground tracking-wide uppercase bg-muted px-2.5 py-1 rounded-full">
+                      Projected
                     </span>
-                    <span className="font-mono tabular-nums text-muted-foreground">
-                      ${fin.eliminated.toLocaleString()} eliminated · ${fin.owed.toLocaleString()} outstanding
-                    </span>
                   </div>
-                  <div className="h-2.5 rounded-full bg-border overflow-hidden">
-                    <motion.div
-                      initial={{ width: 0 }}
-                      animate={{ width: `${fin.percent}%` }}
-                      transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1], delay: 0.3 }}
-                      className="h-full bg-aurora-arc rounded-full"
-                    />
-                  </div>
-                  <div className="flex justify-between text-xs text-muted-foreground mt-1 font-mono tabular-nums">
-                    <span>{fin.percent}% eliminated</span>
-                  </div>
-                </div>
 
-                <div className="mt-4 flex flex-wrap gap-x-6 gap-y-1 text-sm text-muted-foreground">
-                  <span className="flex items-center gap-1.5">
-                    <FileWarning className="w-4 h-4" />
-                    Document URLs: {properties.length === 0
+                  {(() => {
+                    const proj = maintenanceProjection(properties)
+                    if (proj.total === 0) return (
+                      <p className="text-sm text-muted-foreground py-2">No active properties with maintenance fees on file.</p>
+                    )
+                    return (
+                      <>
+                        {/* Total */}
+                        <div className="text-center py-3">
+                          <motion.span
+                            initial={{ opacity: 0, scale: 0.8 }}
+                            animate={{ opacity: 1, scale: 1 }}
+                            transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1], delay: 0.5 }}
+                            className="text-3xl font-heading font-semibold tracking-tight"
+                          >
+                            ${proj.total.toLocaleString()}
+                          </motion.span>
+                          <p className="text-xs text-muted-foreground mt-0.5">projected maintenance costs over 10 years</p>
+                        </div>
+
+                        {/* Breakdown */}
+                        {proj.breakdown.length > 1 && (
+                          <div className="mt-4 space-y-2 border-t pt-4">
+                            <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide">Per Property</p>
+                            {proj.breakdown.map((b, i) => {
+                              const share = b.total / proj.total
+                              return (
+                                <motion.div
+                                  key={b.propertyId}
+                                  initial={{ opacity: 0, x: -8 }}
+                                  animate={{ opacity: 1, x: 0 }}
+                                  transition={{ duration: 0.4, delay: 0.6 + i * 0.06 }}
+                                  className="group"
+                                >
+                                  <div className="flex items-center justify-between text-sm">
+                                    <span className="font-medium truncate mr-2">{b.resortName}</span>
+                                    <span className="font-mono tabular-nums text-sm">${b.total.toLocaleString()}</span>
+                                  </div>
+                                  <div className="flex items-center justify-between text-[11px] text-muted-foreground mt-0.5">
+                                    <span>${b.annualFee.toLocaleString()}/yr · {b.frequency} · {b.years} years</span>
+                                    <span>{Math.round(share * 100)}% of total</span>
+                                  </div>
+                                  {/* Mini bar */}
+                                  <div className="mt-1 h-1 rounded-full bg-border overflow-hidden">
+                                    <motion.div
+                                      initial={{ width: 0 }}
+                                      animate={{ width: `${share * 100}%` }}
+                                      transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1], delay: 0.7 + i * 0.06 }}
+                                      className="h-full rounded-full"
+                                      style={{ backgroundColor: `hsl(${210 + i * 25}, 60%, 55%)` }}
+                                    />
+                                  </div>
+                                  {b.behindAmount != null && b.behindAmount > 0 && (
+                                    <p className="text-[11px] text-surface-warning-fg mt-0.5 font-medium">
+                                      Includes ${b.behindAmount.toLocaleString()} behind on fees
+                                    </p>
+                                  )}
+                                </motion.div>
+                              )
+                            })}
+                          </div>
+                        )}
+
+                        {/* Single property summary */}
+                        {proj.breakdown.length === 1 && (() => {
+                          const b = proj.breakdown[0]
+                          return (
+                            <div className="mt-3 text-xs text-muted-foreground space-y-0.5">
+                              <p>${b.annualFee.toLocaleString()}/yr · {b.frequency} · {b.years} year{b.years > 1 ? 's' : ''}</p>
+                              {b.behindAmount != null && b.behindAmount > 0 && (
+                                <p className="text-surface-warning-fg font-medium">Includes ${b.behindAmount.toLocaleString()} behind on fees</p>
+                              )}
+                            </div>
+                          )
+                        })()}
+                      </>
+                    )
+                  })()}
+                </motion.div>
+
+                {/* Document URLs status */}
+                <div className="mt-4 flex items-center gap-2 text-xs text-muted-foreground">
+                  <FileWarning className="w-3.5 h-3.5" />
+                  <span>
+                    Document URLs:{' '}
+                    {properties.length === 0
                       ? 'no properties on file'
-                      : docsMissing === 0
-                        ? `on file for all ${properties.length} ${properties.length === 1 ? 'property' : 'properties'}`
-                        : `missing for ${docsMissing} of ${properties.length}`}
-                  </span>
-                  <span className="flex items-center gap-1.5">
-                    <TrendingUp className="w-4 h-4" />
-                    Value eliminated: <span className="font-mono tabular-nums">${fin.eliminated.toLocaleString()}</span>
+                      : (() => {
+                          const missing = properties.filter((p) => !p.document_reference).length
+                          return missing === 0
+                            ? `on file for all ${properties.length} ${properties.length === 1 ? 'property' : 'properties'}`
+                            : `missing for ${missing} of ${properties.length}`
+                        })()}
                   </span>
                 </div>
               </section>
