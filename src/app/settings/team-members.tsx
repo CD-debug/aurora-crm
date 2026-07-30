@@ -1,8 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import Link from 'next/link'
-import { Plus, Trash2, X, Check, Loader2, Users, BarChart3 } from 'lucide-react'
+import { Plus, Trash2, X, Check, Loader2, Users } from 'lucide-react'
 import { listTeamMembers, createTeamMember, deleteTeamMember } from '@/lib/data/mutations'
 import type { TeamMember } from '@/lib/data/types'
 import { toast } from 'sonner'
@@ -156,13 +155,6 @@ export function TeamMembers() {
       {members.length > 0 && (
         <div className="mt-4 pt-4 border-t text-xs text-muted-foreground flex items-center justify-between">
           <span>Names you add here appear as the “Author” dropdown in notes and “Assigned to” in tasks.</span>
-          <Link
-            href="/reports"
-            className="inline-flex items-center gap-1 text-primary hover:underline font-medium"
-          >
-            <BarChart3 className="w-3.5 h-3.5" />
-            See team activity
-          </Link>
         </div>
       )}
     </div>
