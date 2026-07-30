@@ -14,7 +14,7 @@ import { toast } from 'sonner'
 import { motion } from 'framer-motion'
 import { ActivityTimeline } from '@/components/shared/ActivityTimeline'
 import {
-  Calendar, Clock, Home, AlertTriangle, CheckCircle, Plus, Trash2,
+  Calendar, Clock, DollarSign, Home, AlertTriangle, CheckCircle, Plus, Trash2,
   Mail, Phone, MessageSquare, FileText, Building2, Target, TrendingUp, Pencil,
   CalendarClock, FileWarning, Percent, CalendarDays, Shield, MapPin, UserCircle, Pin, Save, X,
 } from 'lucide-react'
