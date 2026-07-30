@@ -80,6 +80,51 @@ export interface FinancialProgress {
   percent: number
 }
 
+export function maintenanceProjection(properties: Property[]) {
+  type Breakdown = {
+    propertyId: string
+    resortName: string
+    annualFee: number
+    frequency: string
+    years: number
+    total: number
+    behindAmount: number | null
+  }
+
+  const breakdown: Breakdown[] = []
+  let grandTotal = 0
+
+  for (const p of properties) {
+    if (p.status !== 'active') continue
+    const annualFee = Number(p.maintenance_fee ?? 0)
+    if (annualFee <= 0) continue
+
+    const freq = (p.usage_frequency ?? '').toLowerCase()
+    let years: number
+    if (freq === 'biennial') years = 5
+    else if (freq === 'odd_year' || freq === 'even_year') years = 5
+    else years = 10
+
+    const total = annualFee * years
+    const behind = p.fees_behind_amount ? Number(p.fees_behind_amount) : null
+
+    breakdown.push({
+      propertyId: p.id,
+      resortName: p.resort_name,
+      annualFee,
+      frequency: freq || 'annual',
+      years,
+      total: total + (behind ?? 0),
+      behindAmount: behind,
+    })
+    grandTotal += total + (behind ?? 0)
+  }
+
+  return { total: grandTotal, breakdown }
+}
+
+export type MaintenanceProjection = ReturnType<typeof maintenanceProjection>
+
 export function financialProgress(properties: Property[]): FinancialProgress {
   let owed = 0
   let eliminated = 0
