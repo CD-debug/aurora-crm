@@ -91,7 +91,7 @@ export function DashboardView({ data }: { data: DashboardData }) {
 
       {/* Hero: Debt Eliminated */}
       <FadeUp>
-        <div className="grid grid-cols-1 lg:grid-cols-[1.6fr_1fr] gap-4">
+        <div className="grid grid-cols-1 lg:grid-cols-[1.6fr_1fr] gap-4 section-accent-teal rounded-xl">
           <div className="p-6 rounded-xl border bg-card">
             <p className="text-xs text-muted-foreground font-medium uppercase tracking-wide mb-1">Debt Eliminated</p>
             <p className="text-5xl md:text-6xl font-heading font-normal tracking-[-0.02em] text-foreground">
@@ -123,7 +123,7 @@ export function DashboardView({ data }: { data: DashboardData }) {
 
       {/* Supporting metrics */}
       <FadeUp>
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 section-accent-indigo">
           <MetricTileSmall icon={<Users className="w-4 h-4" />} title="Total Cases" value={data.total_cases} numericValue={data.total_cases} href="/clients" color="primary" />
           <MetricTileSmall icon={<TrendingUp className="w-4 h-4" />} title="Resolution Rate" value={`${data.resolution_rate.toFixed(1)}%`} numericValue={Math.round(data.resolution_rate)} color="success" />
           <MetricTileSmall icon={<Target className="w-4 h-4" />} title="Active" value={data.active_cases} numericValue={data.active_cases} href="/clients?stage=active" color="info" />
@@ -133,7 +133,7 @@ export function DashboardView({ data }: { data: DashboardData }) {
 
       {/* At Risk / Stalled row */}
       <FadeUp>
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 section-accent-amber">
           <MetricTileSmall icon={<AlertTriangle className="w-4 h-4" />} title="At Risk" value={data.at_risk_cases} numericValue={data.at_risk_cases} href="/clients?health=at_risk" color="danger" />
           <MetricTileSmall icon={<AlertCircle className="w-4 h-4" />} title="Stalled" value={data.stalled_cases} numericValue={data.stalled_cases} href="/clients?health=stalled" color="warning" />
           <MetricTileSmall icon={<CheckCircle className="w-4 h-4" />} title="Resolved" value={data.resolved_cases} numericValue={data.resolved_cases} href="/clients?stage=resolved" color="success" />
@@ -143,7 +143,7 @@ export function DashboardView({ data }: { data: DashboardData }) {
 
       {/* Pipeline + Attention */}
       <FadeUp>
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 section-accent-peach">
           <motion.div
             initial={{ opacity: 0, y: 16 }}
             animate={{ opacity: 1, y: 0 }}
