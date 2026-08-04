@@ -2,10 +2,14 @@
 
 import { revalidatePath } from 'next/cache'
 import Papa from 'papaparse'
+import { z } from 'zod'
 import { createServerClient } from '@/lib/supabase/server'
 import { requireUser } from './mutations'
 import { findDuplicates } from './domain'
 import type { PipelineStage } from './types'
+import { setThemeCookie, type ThemeMode } from '@/lib/theme'
+
+const THEME_SCHEMA = z.enum(['light', 'dark', 'system'])
 
 const VALID_STAGES: PipelineStage[] = ['consultation', 'exit_plan', 'in_progress', 'resolved']
 const VALID_USAGE_FREQUENCY = ['annual', 'biennial', 'odd_year', 'even_year'] as const
@@ -439,4 +443,12 @@ export async function importClientsFromCsv(csvText: string) {
   revalidatePath('/clients')
   revalidatePath('/settings')
   return { imported, properties: propertiesImported, duplicates, warnings }
+}
+
+export async function updateTheme(theme: ThemeMode) {
+  const parsed = THEME_SCHEMA.safeParse(theme)
+  if (!parsed.success) throw new Error('Invalid theme')
+  await setThemeCookie(parsed.data)
+  await updateSettings('theme', { mode: parsed.data })
+  revalidatePath('/', 'layout')
 }
