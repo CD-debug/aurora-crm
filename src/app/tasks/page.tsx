@@ -501,7 +501,7 @@ function TasksPageContent() {
           </div>
 
           {/* Quick-add */}
-          <div className="rounded-2xl border border-border/60 bg-card p-5 mb-6 shadow-sm">
+          <div className="rounded-2xl border border-border/60 bg-card p-5 mb-6 shadow-sm section-accent-amber">
             <div className="flex flex-wrap items-center gap-3">
               {!filterClient && clients.length > 1 && (
                 <ClientCombobox
@@ -607,7 +607,7 @@ function TasksPageContent() {
               initial={{ opacity: 0, y: 8 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
-              className="bg-card rounded-2xl overflow-hidden border border-border/60 shadow-sm"
+              className="bg-card rounded-2xl overflow-hidden border border-border/60 shadow-sm section-accent-peach"
             >
               {isLoading ? (
                 <div className="p-5 space-y-3" aria-label="Loading tasks">

@@ -537,7 +537,7 @@ export default function Client360Page() {
             {/* Primary column: statistics → properties → notes (PRD §11.6) */}
             <div className="space-y-6 min-w-0">
               {/* §11.1 Case statistics — all computed */}
-              <section id="statistics" className="rounded-xl border bg-card p-6 scroll-mt-24">
+              <section id="statistics" className="rounded-xl border bg-card p-6 scroll-mt-24 section-accent-teal">
                 <h2 className="text-lg font-semibold mb-4">Case Statistics</h2>
                 <motion.div
                   initial="hidden"
@@ -696,7 +696,7 @@ export default function Client360Page() {
                 initial={{ opacity: 0, y: 16 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1], delay: 0.2 }}
-                id="properties" className="rounded-xl border bg-card scroll-mt-24"
+                id="properties" className="rounded-xl border bg-card scroll-mt-24 section-accent-amber"
               >
                 <div className="p-4 border-b flex items-center justify-between">
                   <h2 className="text-lg font-semibold flex items-center gap-2">
@@ -737,7 +737,7 @@ export default function Client360Page() {
                 initial={{ opacity: 0, y: 16 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1], delay: 0.3 }}
-                id="notes" className="rounded-xl border bg-card scroll-mt-24"
+                id="notes" className="rounded-xl border bg-card scroll-mt-24 section-accent-peach"
               >
                 <div className="p-4 border-b flex items-center justify-between gap-4 flex-wrap">
                   <h2 className="text-lg font-semibold flex items-center gap-2">
@@ -939,7 +939,7 @@ export default function Client360Page() {
               transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1], delay: 0.25 }}
               className="min-w-0"
             >
-              <section id="tasks" className="rounded-xl border bg-card lg:sticky lg:top-24 scroll-mt-24">
+              <section id="tasks" className="rounded-xl border bg-card lg:sticky lg:top-24 scroll-mt-24 section-accent-green">
                 <div className="p-4 border-b flex items-center justify-between">
                   <h2 className="text-lg font-semibold flex items-center gap-2">
                     <Target className="w-5 h-5" />
