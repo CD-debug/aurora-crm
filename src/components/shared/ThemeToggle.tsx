@@ -1,6 +1,6 @@
 'use client'
 
-import { useTransition, useEffect, useState } from 'react'
+import { useTransition, useState, useSyncExternalStore } from 'react'
 import { Sun, Moon, Monitor } from 'lucide-react'
 import { toast } from 'sonner'
 import { updateTheme } from '@/lib/data/settings-actions'
@@ -18,17 +18,22 @@ function readCookie(): ThemeMode {
   return 'light'
 }
 
+// Hydration-safe: server snapshot returns 'light' (matching initial state);
+// client snapshot reads the cookie. The anti-FOUC script in layout.tsx has
+// already applied the correct .dark class to <html> before paint, so the
+// icon update on the first client render is invisible to the user.
+const subscribeNoop = () => () => {}
+const getServerSnapshot = (): ThemeMode => 'light'
+const getClientSnapshot = (): ThemeMode => readCookie()
+
 export function ThemeToggle({ className }: { className?: string }) {
   const [pending, startTransition] = useTransition()
-  const [mode, setMode] = useState<ThemeMode>('light')
-
-  useEffect(() => {
-    setMode(readCookie())
-  }, [])
+  const mode = useSyncExternalStore(subscribeNoop, getClientSnapshot, getServerSnapshot)
+  const [committedMode, setCommittedMode] = useState<ThemeMode>(mode)
 
   const apply = (next: ThemeMode) => {
-    const previous = mode
-    setMode(next)
+    const previous = committedMode
+    setCommittedMode(next)
     const root = document.documentElement
     const sysDark = window.matchMedia('(prefers-color-scheme: dark)').matches
     const shouldBeDark = next === 'dark' || (next === 'system' && sysDark)
@@ -37,7 +42,7 @@ export function ThemeToggle({ className }: { className?: string }) {
       try {
         await updateTheme(next)
       } catch (e) {
-        setMode(previous)
+        setCommittedMode(previous)
         const revertDark = previous === 'dark' || (previous === 'system' && sysDark)
         root.classList.toggle('dark', revertDark)
         toast.error(e instanceof Error ? e.message : "Couldn't switch theme. Try again.")
@@ -46,12 +51,12 @@ export function ThemeToggle({ className }: { className?: string }) {
   }
 
   const cycle = () => {
-    const i = CYCLE.indexOf(mode)
+    const i = CYCLE.indexOf(committedMode)
     apply(CYCLE[(i + 1) % CYCLE.length])
   }
 
-  const Icon = mode === 'dark' ? Moon : mode === 'system' ? Monitor : Sun
-  const label = `Theme: ${mode} (click to switch)`
+  const Icon = committedMode === 'dark' ? Moon : committedMode === 'system' ? Monitor : Sun
+  const label = `Theme: ${committedMode} (click to switch)`
 
   return (
     <button
