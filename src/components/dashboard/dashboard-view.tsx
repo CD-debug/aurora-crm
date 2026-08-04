@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { motion } from 'framer-motion'
-import { ClientHealthBadge } from '@/components/shared'
+import { ClientHealthBadge, ThemeToggle } from '@/components/shared'
 import { Stagger, FadeUp, CountUp } from '@/components/shared/motion'
 import type { DashboardData } from '@/lib/data/types'
 import { STAGE_LABELS } from '@/lib/data/domain'
@@ -82,6 +82,13 @@ export function DashboardView({ data }: { data: DashboardData }) {
 
   return (
     <Stagger className="space-y-6" delay={0.1}>
+      {/* Dashboard header row — toggle in upper-right (per Decision #2) */}
+      <FadeUp>
+        <div className="flex items-center justify-end -mb-2">
+          <ThemeToggle />
+        </div>
+      </FadeUp>
+
       {/* Hero: Debt Eliminated */}
       <FadeUp>
         <div className="grid grid-cols-1 lg:grid-cols-[1.6fr_1fr] gap-4">
