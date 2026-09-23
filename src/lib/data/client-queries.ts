@@ -10,6 +10,22 @@ import type { QueryClient } from '@tanstack/react-query'
 import { queryKeys } from './query-keys'
 import type { Client360, ClientWithHealth, Note, Property, Task, TaskWithClient, TeamMember } from './types'
 
+export async function searchProperties(
+  supabase: SupabaseClient,
+  query: string
+): Promise<(Property & { clients: { name: string } | null })[]> {
+  const q = query.trim().replace(/[%,()]/g, '')
+  if (q.length < 2) return []
+  const { data, error } = await supabase
+    .from('properties')
+    .select('*, clients!inner(name)')
+    .or(`resort_name.ilike.%${q}%,resort_location.ilike.%${q}%`)
+    .order('resort_name', { ascending: true })
+    .limit(10)
+  if (error) throw new Error(`Property search failed: ${error.message}`)
+  return data as (Property & { clients: { name: string } | null })[]
+}
+
 /**
  * Call after any successful server action: refreshes every client-side view
  * of the affected records (PRD §7.4). Server-rendered surfaces (dashboard)

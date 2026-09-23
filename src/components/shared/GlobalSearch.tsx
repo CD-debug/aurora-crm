@@ -8,11 +8,11 @@ import { useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { useQuery } from '@tanstack/react-query'
 import { AnimatePresence, motion } from 'framer-motion'
-import { Search, User, Phone, Mail } from 'lucide-react'
+import { Search, User, Phone, Mail, Building2 } from 'lucide-react'
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command'
 import { ClientHealthBadge } from './badges'
 import { createClient } from '@/lib/supabase/client'
-import { searchClients } from '@/lib/data/client-queries'
+import { searchClients, searchProperties } from '@/lib/data/client-queries'
 import { queryKeys } from '@/lib/data/query-keys'
 import { cn } from '@/lib/utils'
 
@@ -56,10 +56,23 @@ export function GlobalSearch() {
     staleTime: 30_000,
   })
 
+  const { data: properties = [], isFetching: isFetchingProperties } = useQuery({
+    queryKey: queryKeys.properties.search(query),
+    queryFn: () => searchProperties(supabase, query),
+    enabled: open && query.trim().length >= 2,
+    staleTime: 30_000,
+  })
+
   const handleSelect = (clientId: string) => {
     setOpen(false)
     setQuery('')
     router.push(`/clients/${clientId}`)
+  }
+
+  const handlePropertySelect = (clientId: string) => {
+    setOpen(false)
+    setQuery('')
+    router.push(`/clients/${clientId}#properties`)
   }
 
   return (
@@ -73,7 +86,7 @@ export function GlobalSearch() {
             ? 'text-foreground bg-primary/10'
             : 'text-sidebar-foreground/50 hover:text-sidebar-foreground hover:bg-sidebar-accent hover:scale-110'
         )}
-        aria-label="Search clients (Cmd+K)"
+        aria-label="Search clients and properties (Cmd+K)"
         aria-expanded={open}
         tabIndex={0}
       >
@@ -88,7 +101,7 @@ export function GlobalSearch() {
           )}
         >
           <span className="absolute right-full top-1/2 -translate-y-1/2 w-2 h-2 bg-foreground rotate-45 -mr-1 rounded-sm" />
-          Search · ⌘K
+          Search &middot; &copy;K
         </span>
       </button>
 
@@ -102,27 +115,28 @@ export function GlobalSearch() {
             transition={{ duration: 0.15, ease: [0.16, 1, 0.3, 1] }}
             className="fixed left-16 top-1/2 -translate-y-1/2 z-50 w-[420px] max-w-[calc(100vw-5rem)]"
             role="dialog"
-            aria-label="Search clients"
+            aria-label="Search clients and properties"
           >
             <div className="rounded-xl border bg-popover shadow-xl overflow-hidden">
               <Command shouldFilter={false} className="bg-popover">
                 <CommandInput
-                  placeholder="Search clients by name, phone, or email…"
+                  placeholder="Search clients or properties by name, phone, email, resort..."
                   value={query}
                   onValueChange={setQuery}
                   autoFocus
                 />
                 <CommandList className="max-h-[420px]">
                   <CommandGroup>
+                    <div className="px-2 py-1.5 text-xs font-medium text-muted-foreground">Clients</div>
                     {query.trim().length < 2 && (
                       <div className="py-8 px-3 text-center text-sm text-muted-foreground">
                         <Search className="w-8 h-8 mx-auto mb-2 opacity-30" />
                         Keep typing to search your caseload.
                       </div>
                     )}
-                    {isFetching && query.trim().length >= 2 && (
+                    {(isFetching || isFetchingProperties) && query.trim().length >= 2 && (
                       <div className="py-6 text-center text-sm text-muted-foreground">
-                        Searching…
+                        Searching...
                       </div>
                     )}
                     {!isFetching && query.trim().length >= 2 && results.length === 0 && (
@@ -153,6 +167,32 @@ export function GlobalSearch() {
                             <span className="truncate">{client.email}</span>
                           </span>
                           <span className="font-mono ml-auto flex-shrink-0">{client.state}</span>
+                        </div>
+                      </CommandItem>
+                    ))}
+                  </CommandGroup>
+                  <CommandGroup>
+                    <div className="px-2 py-1.5 text-xs font-medium text-muted-foreground">Properties</div>
+                    {!isFetchingProperties && query.trim().length >= 2 && properties.length === 0 && (
+                      <CommandEmpty className="py-6 text-center text-sm text-muted-foreground">
+                        No properties match "{query}".
+                      </CommandEmpty>
+                    )}
+                    {properties.map((property) => (
+                      <CommandItem
+                        key={property.id}
+                        onSelect={() => handlePropertySelect(property.client_id)}
+                        className="flex flex-col items-start gap-1 px-3 py-2.5 rounded-md aria-selected:bg-primary/10"
+                      >
+                        <div className="flex items-center gap-2 w-full">
+                          <Building2 className="h-4 w-4 text-primary flex-shrink-0" />
+                          <span className="font-medium truncate">{property.resort_name}</span>
+                        </div>
+                        <div className="flex items-center gap-3 ml-6 text-xs text-muted-foreground w-full">
+                          <span className="flex items-center gap-1 truncate min-w-0">
+                            <span>{property.resort_location}</span>
+                          </span>
+                          <span className="ml-auto flex-shrink-0 font-medium">{property.clients?.name}</span>
                         </div>
                       </CommandItem>
                     ))}
