@@ -18,13 +18,17 @@ import type { Client, ClientWithHealth, Property } from './types'
 describe('stageIndex / stagePercent', () => {
   it('returns pipeline position', () => {
     expect(stageIndex('consultation')).toBe(0)
-    expect(stageIndex('resolved')).toBe(3)
+    expect(stageIndex('exit_plan')).toBe(1)
+    expect(stageIndex('resort_issue')).toBe(2)
+    expect(stageIndex('in_progress')).toBe(3)
+    expect(stageIndex('resolved')).toBe(4)
   })
 
-  it('percent grows 0 -> 33 -> 67 -> 100 across stages', () => {
+  it('percent grows 0 -> 25 -> 50 -> 75 -> 100 across stages', () => {
     expect(stagePercent('consultation')).toBe(0)
-    expect(stagePercent('exit_plan')).toBe(33)
-    expect(stagePercent('in_progress')).toBe(67)
+    expect(stagePercent('exit_plan')).toBe(25)
+    expect(stagePercent('resort_issue')).toBe(50)
+    expect(stagePercent('in_progress')).toBe(75)
     expect(stagePercent('resolved')).toBe(100)
   })
 

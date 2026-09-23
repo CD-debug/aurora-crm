@@ -14,6 +14,7 @@ import type {
 export const STAGES: readonly PipelineStage[] = [
   'consultation',
   'exit_plan',
+  'resort_issue',
   'in_progress',
   'resolved',
 ] as const
@@ -21,6 +22,7 @@ export const STAGES: readonly PipelineStage[] = [
 export const STAGE_LABELS: Record<PipelineStage, string> = {
   consultation: 'Consultation',
   exit_plan: 'Exit Plan',
+  resort_issue: 'Resort Issue',
   in_progress: 'In Progress',
   resolved: 'Resolved',
 }
