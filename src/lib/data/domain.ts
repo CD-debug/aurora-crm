@@ -21,9 +21,9 @@ export const STAGES: readonly PipelineStage[] = [
 
 export const STAGE_LABELS: Record<PipelineStage, string> = {
   consultation: 'Consultation',
-  exit_plan: 'Exit Plan',
+  exit_plan: 'In Progress',
   resort_issue: 'Resort Issue',
-  in_progress: 'In Progress',
+  in_progress: 'Exit Plan',
   resolved: 'Resolved',
 }
 
