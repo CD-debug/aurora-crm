@@ -73,6 +73,7 @@ function AttentionRow({ client, index }: {
 export function DashboardView({ data }: { data: DashboardData }) {
   const stageData = [
     { stage: 'consultation', label: STAGE_LABELS.consultation, color: 'var(--chart-1)' },
+    { stage: 'hold', label: STAGE_LABELS.hold, color: 'var(--chart-6)' },
     { stage: 'exit_plan', label: STAGE_LABELS.exit_plan, color: 'var(--chart-2)' },
     { stage: 'resort_issue', label: STAGE_LABELS.resort_issue, color: 'var(--chart-3)' },
     { stage: 'in_progress', label: STAGE_LABELS.in_progress, color: 'var(--chart-4)' },

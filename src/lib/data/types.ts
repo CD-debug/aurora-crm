@@ -3,7 +3,7 @@
 // Derived values (health, last contact, task status) are COMPUTED —
 // see the clients_with_health view and lib/data/domain.ts. Never stored by hand.
 
-export type PipelineStage = 'consultation' | 'exit_plan' | 'resort_issue' | 'in_progress' | 'resolved'
+export type PipelineStage = 'consultation' | 'hold' | 'exit_plan' | 'resort_issue' | 'in_progress' | 'resolved'
 export type HealthStatus = 'on_track' | 'at_risk' | 'stalled'
 export type TaskStatus = 'upcoming' | 'overdue' | 'completed' // derived, never stored
 export type NoteChannel = 'email' | 'phone' | 'text'

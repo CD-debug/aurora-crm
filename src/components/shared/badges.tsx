@@ -55,6 +55,7 @@ export function TaskStatusBadge({
 
 const stageVariants: Record<PipelineStage, string> = {
   consultation: 'bg-chart-1/10 text-chart-1 border-chart-1/30',
+  hold: 'bg-chart-6/10 text-chart-6 border-chart-6/30',
   exit_plan: 'bg-chart-2/10 text-chart-2 border-chart-2/30',
   resort_issue: 'bg-surface-warning text-surface-warning-fg border-surface-warning-fg/30',
   in_progress: 'bg-surface-warning text-surface-warning-fg border-surface-warning-fg/30',
