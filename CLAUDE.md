@@ -61,3 +61,4 @@ Apply with `className="section-accent-{teal|indigo|amber|green|peach}"` on a wra
   npx supabase db push
   ```
   (CLI is logged in and linked to project)
+- **Parent repo (`ResolutionCoreCRM`) has no GitHub remote** — it only tracks the `aurora-crm` submodule commit locally. The submodule (`aurora-crm`) is what's connected to Vercel/Supabase. Push to submodule origin triggers deploy; parent just records the new submodule SHA.
