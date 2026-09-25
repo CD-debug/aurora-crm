@@ -11,7 +11,7 @@ import { setThemeCookie, type ThemeMode } from '@/lib/theme'
 
 const THEME_SCHEMA = z.enum(['light', 'dark', 'system'])
 
-const VALID_STAGES: PipelineStage[] = ['consultation', 'exit_plan', 'resort_issue', 'in_progress', 'resolved']
+const VALID_STAGES: PipelineStage[] = ['consultation', 'hold', 'exit_plan', 'resort_issue', 'in_progress', 'resolved']
 const VALID_USAGE_FREQUENCY = ['annual', 'biennial', 'odd_year', 'even_year'] as const
 const VALID_USAGE_TYPE = ['fixed_week', 'floating_week', 'points_based'] as const
 

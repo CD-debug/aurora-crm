@@ -77,7 +77,7 @@ export async function updateClient(clientId: string, input: z.input<typeof clien
   revalidate(clientId)
 }
 
-const stageInput = z.enum(['consultation', 'exit_plan', 'resort_issue', 'in_progress', 'resolved'])
+const stageInput = z.enum(['consultation', 'hold', 'exit_plan', 'resort_issue', 'in_progress', 'resolved'])
 
 export async function updateClientStage(clientId: string, stage: PipelineStage) {
   const { supabase } = await requireUser()
