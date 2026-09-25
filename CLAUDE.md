@@ -41,3 +41,23 @@ Apply with `className="section-accent-{teal|indigo|amber|green|peach}"` on a wra
 ## Active Branch
 
 `feat/vibrant-refresh-dark-mode` — contains Phase 1–7 of the vibrant refresh. The PRD (`C:\ResolutionCoreCRM\aurora-crm-master-prd.md`) §8.2 and §8.8 were updated locally on disk; that file is not part of the `aurora-crm` git repo so the changes are uncommitted until the parent repo decides where to track it.
+
+## Git / Deploy Notes (Sep 2026)
+
+- **Git remote:** `origin` → `https://github.com/CD-debug/aurora-crm.git` (master branch)
+- **Vercel:** Connected to GitHub repo `CD-debug/aurora-crm` — auto-deploys on push to `master`
+- **Supabase:** Linked project `aurora-crm` (ref: `zkjytbnalmzmfxjkrhmn`)
+- **Commit workflow:** Edit files in `aurora-crm/`, then:
+  ```bash
+  cd C:\ResolutionCoreCRM\aurora-crm
+  git add -A
+  git commit -m "message"
+  git push origin master
+  ```
+  Vercel builds automatically — no manual `vercel` CLI deploy needed.
+- **Migration workflow:** Add `.sql` to `supabase/migrations/`, then:
+  ```bash
+  cd C:\ResolutionCoreCRM\aurora-crm
+  npx supabase db push
+  ```
+  (CLI is logged in and linked to project)
