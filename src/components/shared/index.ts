@@ -1,4 +1,4 @@
-export { NavRail } from './NavRail'
+export { NavRail, MobileNavBar, MobileNavDrawer } from './NavRail'
 export { GlobalSearch } from './GlobalSearch'
 export { PageHeader, Breadcrumb } from './PageHeader'
 export { AuroraMark, Wordmark } from './AuroraMark'

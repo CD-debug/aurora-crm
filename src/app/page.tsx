@@ -3,7 +3,7 @@
 
 import Link from 'next/link'
 import { getDashboardData } from '@/lib/data/queries'
-import { NavRail, PageHeader } from '@/components/shared'
+import { NavRail, MobileNavBar, MobileNavDrawer, PageHeader } from '@/components/shared'
 import { DashboardView } from '@/components/dashboard/dashboard-view'
 
 export const metadata = { title: 'Overview — Aurora CRM' }
@@ -25,7 +25,9 @@ export default async function DashboardPage() {
   return (
     <div className="flex min-h-screen bg-background">
       <NavRail />
-      <main className="flex-1 ml-16 overflow-auto">
+      <MobileNavBar />
+      <MobileNavDrawer />
+      <main className="flex-1 lg:ml-16 overflow-auto pb-16 lg:pb-0">
         <PageHeader
           title="Overview"
           subtitle={subtitle}

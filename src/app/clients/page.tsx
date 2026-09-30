@@ -20,7 +20,7 @@ import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuIte
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription, SheetFooter } from '@/components/ui/sheet'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog'
-import { NavRail, AuroraArcStepper, StageBadge, PhoneInput, SsnInput, CurrencyInput } from '@/components/shared'
+import { NavRail, MobileNavBar, MobileNavDrawer, AuroraArcStepper, StageBadge, PhoneInput, SsnInput, CurrencyInput } from '@/components/shared'
 import { createClient } from '@/lib/supabase/client'
 import { fetchClients, invalidateAfterMutation } from '@/lib/data/client-queries'
 import { queryKeys } from '@/lib/data/query-keys'
@@ -170,7 +170,9 @@ function ClientsPageContent() {
   return (
     <div className="flex h-screen bg-background">
       <NavRail />
-      <main className="flex-1 ml-16 overflow-auto">
+      <MobileNavBar />
+      <MobileNavDrawer />
+      <main className="flex-1 lg:ml-16 overflow-auto pb-16 lg:pb-0">
         <div className="container mx-auto px-4 py-6">
           {/* Header */}
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">

@@ -25,7 +25,7 @@ import { Badge } from '@/components/ui/badge'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription, SheetFooter } from '@/components/ui/sheet'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog'
-import { NavRail, Breadcrumb, AuroraArcStepper, ClientHealthBadge, StageBadge, TaskStatusBadge, CurrencyInput, YesNoToggle, ConditionalField, PhoneInput, SsnInput } from '@/components/shared'
+import { NavRail, MobileNavBar, MobileNavDrawer, Breadcrumb, AuroraArcStepper, ClientHealthBadge, StageBadge, TaskStatusBadge, CurrencyInput, YesNoToggle, ConditionalField, PhoneInput, SsnInput } from '@/components/shared'
 import { createClient } from '@/lib/supabase/client'
 import { fetchClient360, fetchTeamMembers, invalidateAfterMutation } from '@/lib/data/client-queries'
 import { queryKeys } from '@/lib/data/query-keys'
@@ -438,7 +438,9 @@ export default function Client360Page() {
   return (
     <div className="flex h-screen bg-background">
       <NavRail />
-      <main className="flex-1 ml-16 overflow-auto">
+      <MobileNavBar />
+      <MobileNavDrawer />
+      <main className="flex-1 lg:ml-16 overflow-auto pb-16 lg:pb-0">
         {/* Sticky header (PRD §11.6) */}
         <header className="sticky top-0 z-30 bg-background/95 backdrop-blur border-b border-border">
           <div className="container mx-auto px-4 py-3">

@@ -14,7 +14,7 @@ import {
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { NavRail, ClientCombobox } from '@/components/shared'
+import { NavRail, MobileNavBar, MobileNavDrawer, ClientCombobox } from '@/components/shared'
 import { createClient } from '@/lib/supabase/client'
 import { fetchClients, fetchTasks, fetchTeamMembers, invalidateAfterMutation } from '@/lib/data/client-queries'
 import { queryKeys } from '@/lib/data/query-keys'
@@ -479,7 +479,9 @@ function TasksPageContent() {
   return (
     <div className="flex min-h-screen bg-background">
       <NavRail />
-      <main className="flex-1 ml-16 overflow-auto">
+      <MobileNavBar />
+      <MobileNavDrawer />
+      <main className="flex-1 lg:ml-16 overflow-auto pb-16 lg:pb-0">
         <div className="max-w-5xl mx-auto px-4 sm:px-6 py-8">
 
           {/* Header + stat strip */}

@@ -1,4 +1,4 @@
-import { NavRail, PageHeader } from '@/components/shared'
+import { NavRail, MobileNavBar, MobileNavDrawer, PageHeader } from '@/components/shared'
 import { GeneralSettings } from './general-settings'
 import { TeamMembers } from './team-members'
 import { CsvImportExport } from './csv-import-export'
@@ -9,7 +9,9 @@ export default function SettingsPage() {
   return (
     <div className="flex min-h-screen bg-background">
       <NavRail />
-      <main className="flex-1 ml-16 overflow-auto">
+      <MobileNavBar />
+      <MobileNavDrawer />
+      <main className="flex-1 lg:ml-16 overflow-auto pb-16 lg:pb-0">
         <PageHeader
           title="Settings"
           subtitle="Configure your Aurora CRM workspace."

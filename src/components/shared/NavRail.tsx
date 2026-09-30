@@ -2,11 +2,13 @@
 
 import Link from 'next/link'
 import { cn } from '@/lib/utils'
-import { LayoutDashboard, Users, ListChecks, Settings } from 'lucide-react'
+import { LayoutDashboard, Users, ListChecks, Settings, Menu, X, Search } from 'lucide-react'
 import { GlobalSearch } from './GlobalSearch'
 import { AuroraMark } from './AuroraMark'
 import { usePathname } from 'next/navigation'
 import { useEffect, useState } from 'react'
+import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet'
+import { Button } from '@/components/ui/button'
 
 const navItems = [
   { href: '/', label: 'Dashboard', icon: LayoutDashboard },
@@ -29,7 +31,7 @@ export function NavRail() {
   }, [pathname])
 
   return (
-    <aside className="fixed left-0 top-0 z-40 h-screen w-16 bg-sidebar border-r border-sidebar-border flex flex-col items-center">
+    <aside className="hidden lg:fixed lg:left-0 lg:top-0 lg:z-40 lg:h-screen lg:w-16 bg-sidebar border-r border-sidebar-border lg:flex lg:flex-col lg:items-center">
       <Link
         href="/"
         className="mt-4 mb-6 flex items-center justify-center"
@@ -82,5 +84,106 @@ export function NavRail() {
         <GlobalSearch />
       </div>
     </aside>
+  )
+}
+
+export function MobileNavBar() {
+  const pathname = usePathname()
+  const [activeIdx, setActiveIdx] = useState(-1)
+
+  useEffect(() => {
+    const idx = navItems.findIndex(
+      (item) => pathname === item.href || (item.href !== '/' && pathname.startsWith(item.href))
+    )
+    setActiveIdx(idx)
+  }, [pathname])
+
+  return (
+    <nav className="lg:hidden fixed bottom-0 left-0 right-0 z-50 bg-sidebar border-t border-sidebar-border">
+      <div className="flex items-center justify-around h-16 px-2">
+        {navItems.map((item, index) => {
+          const isActive = pathname === item.href || (item.href !== '/' && pathname.startsWith(item.href))
+          return (
+            <Link
+              key={item.href}
+              href={item.href}
+              className={cn(
+                'flex flex-col items-center gap-1 px-3 py-2 rounded-xl text-xs font-medium transition-colors',
+                isActive
+                  ? 'text-primary bg-primary/10'
+                  : 'text-sidebar-foreground/70 active:text-sidebar-foreground'
+              )}
+              aria-label={item.label}
+              aria-current={isActive ? 'page' : undefined}
+            >
+              <item.icon className="w-5 h-5" aria-hidden="true" />
+              <span>{item.label}</span>
+            </Link>
+          )
+        })}
+      </div>
+    </nav>
+  )
+}
+
+export function MobileNavDrawer() {
+  const pathname = usePathname()
+  const [open, setOpen] = useState(false)
+
+  return (
+    <>
+      <Button
+        className="lg:hidden fixed bottom-24 right-4 z-50 rounded-full shadow-lg"
+        onClick={() => setOpen(true)}
+        aria-label="Open navigation"
+        variant="default"
+        size="icon"
+      >
+        <Menu className="w-6 h-6" />
+      </Button>
+
+      <Sheet open={open} onOpenChange={setOpen}>
+        <SheetContent side="right" className="w-72 p-0">
+          <div className="flex h-full flex-col">
+            <div className="flex items-center justify-between p-4 border-b">
+              <Link href="/" className="flex items-center justify-center" aria-label="Aurora home">
+                <AuroraMark size="sm" />
+              </Link>
+              <Button variant="ghost" size="icon" onClick={() => setOpen(false)} aria-label="Close">
+                <X className="w-5 h-5" />
+              </Button>
+            </div>
+
+            <nav className="flex-1 p-4 space-y-1 overflow-y-auto" aria-label="Main navigation">
+              {navItems.map((item) => {
+                const isActive = pathname === item.href || (item.href !== '/' && pathname.startsWith(item.href))
+                return (
+                  <Link
+                    key={item.href}
+                    href={item.href}
+                    onClick={() => setOpen(false)}
+                    className={cn(
+                      'flex items-center gap-3 px-3 py-3 rounded-xl text-base font-medium transition-colors',
+                      isActive
+                        ? 'bg-primary/10 text-primary'
+                        : 'text-sidebar-foreground hover:bg-sidebar-accent'
+                    )}
+                    aria-label={item.label}
+                    aria-current={isActive ? 'page' : undefined}
+                  >
+                    <item.icon className="w-5 h-5 flex-shrink-0" aria-hidden="true" />
+                    {item.label}
+                  </Link>
+                )
+              })}
+            </nav>
+
+            <div className="p-4 border-t">
+              <GlobalSearch />
+            </div>
+          </div>
+        </SheetContent>
+      </Sheet>
+    </>
   )
 }
