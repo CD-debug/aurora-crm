@@ -48,6 +48,7 @@ export interface ClientWithHealth extends Client {
   overdue_task_count: number
   next_task_due: string | null // nearest open task due date (today or later)
   health_status: HealthStatus
+  current_annual_maintenance_fee: number | null // sum of maintenance_fee for active properties
 }
 
 export interface Property {

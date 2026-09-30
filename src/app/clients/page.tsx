@@ -20,7 +20,7 @@ import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuIte
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription, SheetFooter } from '@/components/ui/sheet'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog'
-import { NavRail, AuroraArcStepper, ClientHealthBadge, StageBadge, PhoneInput, SsnInput, CurrencyInput } from '@/components/shared'
+import { NavRail, AuroraArcStepper, StageBadge, PhoneInput, SsnInput, CurrencyInput } from '@/components/shared'
 import { createClient } from '@/lib/supabase/client'
 import { fetchClients, invalidateAfterMutation } from '@/lib/data/client-queries'
 import { queryKeys } from '@/lib/data/query-keys'
@@ -30,8 +30,13 @@ import type { ClientWithHealth } from '@/lib/data/types'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
 
-const SORTABLE = ['name', 'state', 'zip', 'email', 'health_status', 'stage', 'last_contact_at'] as const
+const SORTABLE = ['name', 'state', 'zip', 'email', 'current_annual_maintenance_fee', 'stage', 'last_contact_at'] as const
 type SortKey = (typeof SORTABLE)[number]
+
+function formatCurrency(value: number | null): string {
+  if (value == null || value === 0) return '—'
+  return '$' + value.toLocaleString('en-US', { maximumFractionDigits: 0 })
+}
 
 const EMPTY_FORM = {
   name: '', phone: '', email: '', state: '', zip: '', tags: '',
@@ -270,19 +275,19 @@ function ClientsPageContent() {
           ) : (
             <div className="rounded-lg border bg-card overflow-hidden">
               <Table>
-                <TableHeader>
-                  <TableRow className="bg-muted/50">
-                    <SortHead label="Name" k="name" />
-                    <TableHead>Phone</TableHead>
-                    <SortHead label="State" k="state" />
-                    <SortHead label="ZIP" k="zip" />
-                    <SortHead label="Email" k="email" />
-                    <SortHead label="Health" k="health_status" />
-                    <SortHead label="Stage" k="stage" />
-                    <SortHead label="Last Contact" k="last_contact_at" />
-                    <TableHead className="w-12" />
-                  </TableRow>
-                </TableHeader>
+<TableHeader>
+                <TableRow className="bg-muted/50">
+                  <SortHead label="Name" k="name" />
+                  <TableHead>Phone</TableHead>
+                  <SortHead label="State" k="state" />
+                  <SortHead label="ZIP" k="zip" />
+                  <SortHead label="Email" k="email" />
+                  <SortHead label="CAMF" k="current_annual_maintenance_fee" className="text-right" />
+                  <SortHead label="Stage" k="stage" />
+                  <SortHead label="Last Contact" k="last_contact_at" />
+                  <TableHead className="w-12" />
+                </TableRow>
+              </TableHeader>
                 <TableBody>
                   {visible.map((client) => (
                     <TableRow
@@ -304,7 +309,7 @@ function ClientsPageContent() {
                       <TableCell>{client.state}</TableCell>
                       <TableCell className="font-mono text-sm">{client.zip}</TableCell>
                       <TableCell className="max-w-[200px] truncate">{client.email}</TableCell>
-                      <TableCell><ClientHealthBadge status={client.health_status} /></TableCell>
+                      <TableCell className="font-mono tabular-nums text-right">{formatCurrency(client.current_annual_maintenance_fee)}/yr</TableCell>
                       <TableCell>
                         <div className="flex items-center gap-2">
                           <AuroraArcStepper currentStage={client.stage} variant="mini" />
