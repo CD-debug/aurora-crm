@@ -533,9 +533,7 @@ export default function Client360Page() {
             )}
           </div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-[1fr_380px] gap-6 mt-4">
-            {/* Primary column: statistics → properties → notes (PRD §11.6) */}
-            <div className="space-y-6 min-w-0">
+          <div className="space-y-6 mt-4">
               {/* §11.1 Case statistics — all computed */}
               <section id="statistics" className="rounded-xl border bg-card p-6 scroll-mt-24 section-accent-teal">
                 <h2 className="text-lg font-semibold mb-4">Case Statistics</h2>
@@ -578,7 +576,7 @@ export default function Client360Page() {
               <motion.section
                 initial={{ opacity: 0, y: 16 }}
                 animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1], delay: 0.35 }}
+                transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1], delay: 0.2 }}
                 className="rounded-xl border bg-card overflow-hidden"
               >
                 {(() => {
@@ -713,7 +711,7 @@ export default function Client360Page() {
               <motion.section
                 initial={{ opacity: 0, y: 16 }}
                 animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1], delay: 0.2 }}
+                transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1], delay: 0.25 }}
                 id="properties" className="rounded-xl border bg-card scroll-mt-24 section-accent-amber"
               >
                 <div className="p-4 border-b flex items-center justify-between">
@@ -781,8 +779,8 @@ export default function Client360Page() {
                     </Select>
                   )}
                 </div>
-                <div className="p-4 border-b bg-muted/20">
-                  <div className="flex gap-2">
+                <div className="p-4 border-b bg-muted/20 space-y-3">
+                  <div className="flex gap-2 flex-wrap">
                     <Select value={noteChannel} onValueChange={(v) => setNoteChannel(v as NoteChannel)}>
                       <SelectTrigger className="w-[130px]" aria-label="Note channel">
                         <SelectValue />
@@ -805,12 +803,14 @@ export default function Client360Page() {
                         </SelectContent>
                       </Select>
                     )}
+                  </div>
+                  <div className="flex gap-2">
                     <Textarea
                       value={noteContent}
                       onChange={(e) => setNoteContent(e.target.value)}
                       onKeyDown={(e) => { if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') submitNote() }}
                       placeholder={`Log a ${CHANNEL_META[noteChannel].label.toLowerCase()} with ${client.name}… (Ctrl+Enter to save)`}
-                      rows={2}
+                      rows={6}
                       className="flex-1"
                     />
                     <Button onClick={submitNote} disabled={noteSaving || !noteContent.trim()} className="self-end">
@@ -938,7 +938,7 @@ export default function Client360Page() {
               <motion.section
                 initial={{ opacity: 0, y: 12 }}
                 animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1], delay: 0.3 }}
+                transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1], delay: 0.35 }}
                 className="mt-6 rounded-xl border bg-card p-4"
               >
                 <h2 className="text-lg font-semibold mb-4">Activity Timeline</h2>
@@ -948,63 +948,62 @@ export default function Client360Page() {
                   ...properties.map(p => ({ id: p.id, type: 'property' as const, title: `Property: ${p.resort_name}`, description: p.status === 'paid_off' ? 'Paid off' : undefined, date: p.created_at })),
                 ]} />
               </motion.section>
-            </div>
 
-            {/* §11.4 Tasks & Appointments — persistent right column */}
-            <motion.div
-              initial={{ opacity: 0, x: 16 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1], delay: 0.25 }}
-              className="min-w-0"
+{/* §11.4 Tasks & Appointments — now inline after Activity Timeline */}
+            <motion.section
+              initial={{ opacity: 0, y: 12 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1], delay: 0.4 }}
+              id="tasks"
+              className="rounded-xl border bg-card section-accent-green"
             >
-              <section id="tasks" className="rounded-xl border bg-card lg:sticky lg:top-24 scroll-mt-24 section-accent-green">
-                <div className="p-4 border-b flex items-center justify-between">
-                  <h2 className="text-lg font-semibold flex items-center gap-2">
-                    <Target className="w-5 h-5" />
-                    Tasks &amp; Appointments
-                  </h2>
-                  <Button variant="ghost" size="sm" onClick={() => router.push(`/tasks?client=${clientId}`)}>
-                    Open in Tasks →
+              <div className="p-4 border-b flex items-center justify-between">
+                <h2 className="text-lg font-semibold flex items-center gap-2">
+                  <Target className="w-5 h-5" />
+                  Tasks & Appointments
+                </h2>
+                <Button variant="ghost" size="sm" onClick={() => router.push(`/tasks?client=${clientId}`)}>
+                  Open in Tasks →
+                </Button>
+              </div>
+
+              {/* Inline quick-add */}
+              <div className="p-3 border-b bg-muted/20 space-y-2">
+                <Input
+                  value={taskTitle}
+                  onChange={(e) => setTaskTitle(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === 'Enter') submitTask() }}
+                  placeholder="Follow up on…"
+                  aria-label="New task title"
+                />
+                <div className="flex gap-2 flex-wrap">
+                  <Input
+                    type="date"
+                    value={taskDue}
+                    onChange={(e) => setTaskDue(e.target.value)}
+                    aria-label="New task due date"
+                    className="flex-1 min-w-[140px]"
+                  />
+                  {teamMembers.length > 0 && (
+                    <Select value={taskAssigneeId ?? ''} onValueChange={(v) => setTaskAssigneeId(v || null)}>
+                      <SelectTrigger className="w-[150px]" aria-label="Assign task to">
+                        <SelectValue placeholder="Unassigned" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {teamMembers.map((m) => (
+                          <SelectItem key={m.id} value={m.id}>{m.name}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  )}
+                  <Button onClick={submitTask} disabled={taskSaving || !taskTitle.trim() || !taskDue}>
+                    <Plus className="w-4 h-4 mr-1" />
+                    Add
                   </Button>
                 </div>
+              </div>
 
-                {/* Inline quick-add */}
-                <div className="p-3 border-b bg-muted/20 space-y-2">
-                  <Input
-                    value={taskTitle}
-                    onChange={(e) => setTaskTitle(e.target.value)}
-                    onKeyDown={(e) => { if (e.key === 'Enter') submitTask() }}
-                    placeholder="Follow up on…"
-                    aria-label="New task title"
-                  />
-                  <div className="flex gap-2">
-                    <Input
-                      type="date"
-                      value={taskDue}
-                      onChange={(e) => setTaskDue(e.target.value)}
-                      aria-label="New task due date"
-                      className="flex-1"
-                    />
-                    {teamMembers.length > 0 && (
-                      <Select value={taskAssigneeId ?? ''} onValueChange={(v) => setTaskAssigneeId(v || null)}>
-                        <SelectTrigger className="w-[150px]" aria-label="Assign task to">
-                          <SelectValue placeholder="Unassigned" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {teamMembers.map((m) => (
-                            <SelectItem key={m.id} value={m.id}>{m.name}</SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    )}
-                    <Button onClick={submitTask} disabled={taskSaving || !taskTitle.trim() || !taskDue}>
-                      <Plus className="w-4 h-4 mr-1" />
-                      Add
-                    </Button>
-                  </div>
-                </div>
-
-                <div className="divide-y max-h-[520px] overflow-y-auto">
+              <div className="divide-y max-h-[700px] overflow-y-auto">
                   {tasks.length === 0 ? (
                     <div className="p-8 text-center text-muted-foreground">
                       Nothing due today. Add a task to keep this case moving.
@@ -1065,8 +1064,7 @@ export default function Client360Page() {
                     })
                   )}
                 </div>
-              </section>
-            </motion.div>
+            </motion.section>
           </div>
         </div>
 
