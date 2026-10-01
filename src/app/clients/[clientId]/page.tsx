@@ -67,6 +67,18 @@ export default function Client360Page() {
     retry: false,
   })
 
+  // --- Recently Viewed tracking -----------------------------------------------
+  useEffect(() => {
+    if (data?.client) {
+      supabase
+        .from('recently_viewed')
+        .upsert({ client_id: clientId }, { onConflict: 'user_id,client_id' })
+        .then(({ error }) => {
+          if (error) console.error('Failed to record recently viewed:', error)
+        })
+    }
+  }, [data?.client, clientId, supabase])
+
   // --- Stage transition (inline confirm, PRD §7.5/§11.5) ---------------------
   const [pendingStage, setPendingStage] = useState<PipelineStage | null>(null)
   const [stageSaving, setStageSaving] = useState(false)

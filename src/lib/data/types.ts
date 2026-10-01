@@ -122,6 +122,12 @@ export interface TaskWithClient extends Task {
   clients: { name: string; state: string } | null
 }
 
+export interface RecentlyViewed {
+  client_id: string
+  client_name: string
+  viewed_at: string
+}
+
 /** Everything the Client 360 workspace needs, fetched as one unit. */
 export interface Client360 {
   client: ClientWithHealth
@@ -144,12 +150,9 @@ export interface DashboardData {
   resolution_rate: number
   stage_counts: Record<PipelineStage, number>
   unresponsive_count: number
-  attention: Array<{
-    id: string
-    name: string
-    health_status: HealthStatus
-    stage: PipelineStage
-    last_contact_at: string | null
-    overdue_task_count: number
+  recently_viewed: Array<{
+    client_id: string
+    client_name: string
+    viewed_at: string
   }>
 }

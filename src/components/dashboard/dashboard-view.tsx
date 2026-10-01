@@ -2,6 +2,7 @@
 
 import Link from 'next/link'
 import { motion } from 'framer-motion'
+import { format } from 'date-fns'
 import { ClientHealthBadge, ThemeToggle } from '@/components/shared'
 import { Stagger, FadeUp, CountUp } from '@/components/shared/motion'
 import type { DashboardData } from '@/lib/data/types'
@@ -39,13 +40,10 @@ function MetricTileSmall({ icon, title, value, numericValue, href, color }: {
   return inner
 }
 
-function AttentionRow({ client, index }: {
-  client: DashboardData['attention'][number]
+function RecentRow({ client, index }: {
+  client: DashboardData['recently_viewed'][number]
   index: number
 }) {
-  const isOverdue = client.overdue_task_count > 0
-  const isStalled = client.health_status === 'stalled'
-
   return (
     <motion.div
       initial={{ opacity: 0, x: -12 }}
@@ -53,18 +51,15 @@ function AttentionRow({ client, index }: {
       transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1], delay: 0.3 + index * 0.05 }}
     >
       <Link
-        href={`/clients/${client.id}`}
+        href={`/clients/${client.client_id}`}
         className="flex items-center justify-between p-3 rounded-lg hover:bg-muted/40 transition-colors group"
       >
         <div className="min-w-0">
-          <p className="font-medium text-sm truncate group-hover:text-foreground transition-colors">{client.name}</p>
+          <p className="font-medium text-sm truncate group-hover:text-foreground transition-colors">{client.client_name}</p>
           <p className="text-xs text-muted-foreground">
-            {isOverdue
-              ? `${client.overdue_task_count} overdue task${client.overdue_task_count !== 1 ? 's' : ''}`
-              : isStalled ? 'Stalled' : 'At risk'}
+            Viewed {format(new Date(client.viewed_at), 'MMM d, yyyy h:mm a')}
           </p>
         </div>
-        <ClientHealthBadge status={client.health_status} />
       </Link>
     </motion.div>
   )
@@ -225,13 +220,13 @@ export function DashboardView({ data }: { data: DashboardData }) {
             transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1], delay: 0.45 }}
             className="p-6 rounded-xl border bg-card"
           >
-            <h3 className="text-sm font-semibold text-foreground mb-4 uppercase tracking-wide">Needs Attention</h3>
-            {data.attention.length === 0 ? (
-              <p className="text-sm text-muted-foreground py-8 text-center">All cases on track</p>
+            <h3 className="text-sm font-semibold text-foreground mb-4 uppercase tracking-wide">Recently Viewed</h3>
+            {data.recently_viewed.length === 0 ? (
+              <p className="text-sm text-muted-foreground py-8 text-center">No Recent Clients</p>
             ) : (
               <div className="space-y-1">
-                {data.attention.map((client, i) => (
-                  <AttentionRow key={client.id} client={client} index={i} />
+                {data.recently_viewed.map((client, i) => (
+                  <RecentRow key={client.client_id} client={client} index={i} />
                 ))}
               </div>
             )}

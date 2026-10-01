@@ -9,15 +9,21 @@ import { STAGES } from './domain'
 export async function getDashboardData(): Promise<DashboardData> {
   const supabase = await createServerClient()
 
-  const [clientsRes, propsRes] = await Promise.all([
+  const [clientsRes, propsRes, recentRes] = await Promise.all([
     supabase
       .from('clients_with_health')
       .select('id, name, stage, health_status, case_opened_at, resolved_at, last_contact_at, overdue_task_count, is_unresponsive, current_annual_maintenance_fee'),
     supabase.from('properties').select('status'),
+    supabase
+      .from('recently_viewed')
+      .select('client_id, viewed_at, clients!inner(name)')
+      .order('viewed_at', { ascending: false })
+      .limit(6),
   ])
 
   if (clientsRes.error) throw new Error(`Couldn't load dashboard metrics: ${clientsRes.error.message}`)
   if (propsRes.error) throw new Error(`Couldn't load dashboard metrics: ${propsRes.error.message}`)
+  if (recentRes.error) throw new Error(`Couldn't load recently viewed: ${recentRes.error.message}`)
 
   const clients = clientsRes.data as Array<
     Pick<
@@ -25,7 +31,12 @@ export async function getDashboardData(): Promise<DashboardData> {
       'id' | 'name' | 'stage' | 'health_status' | 'case_opened_at' | 'resolved_at' | 'last_contact_at' | 'overdue_task_count' | 'is_unresponsive' | 'current_annual_maintenance_fee'
     >
   >
-  const properties = propsRes.data as Array<Pick<Property, 'status' | 'value_eliminated' | 'loan_balance' | 'paid_off_at'>>
+  const properties = propsRes.data as Array<Pick<Property, 'status'>>
+  const recentlyViewed = (recentRes.data as Array<{ client_id: string; viewed_at: string; clients: { name: string }[] }>).map((r) => ({
+    client_id: r.client_id,
+    viewed_at: r.viewed_at,
+    client_name: r.clients[0]?.name ?? '',
+  }))
 
   const stage_counts = Object.fromEntries(STAGES.map((s) => [s, 0])) as Record<PipelineStage, number>
   let unresponsive_count = 0
@@ -69,18 +80,11 @@ export async function getDashboardData(): Promise<DashboardData> {
     resolution_rate: clients.length > 0 ? (resolved.length / clients.length) * 100 : 0,
     stage_counts,
     unresponsive_count,
-    attention: clients
-      .filter((c) => c.health_status !== 'on_track')
-      .sort((a, b) => (a.health_status === b.health_status ? 0 : a.health_status === 'stalled' ? -1 : 1))
-      .slice(0, 6)
-      .map((c) => ({
-        id: c.id,
-        name: c.name,
-        health_status: c.health_status,
-        stage: c.stage,
-        last_contact_at: c.last_contact_at,
-        overdue_task_count: c.overdue_task_count,
-      })),
+    recently_viewed: recentlyViewed.map((r) => ({
+      client_id: r.client_id,
+      client_name: r.client_name,
+      viewed_at: r.viewed_at,
+    })),
   }
 }
 
