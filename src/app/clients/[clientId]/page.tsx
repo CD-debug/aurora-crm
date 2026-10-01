@@ -971,26 +971,11 @@ export default function Client360Page() {
                 onSave={handleSaveClosing}
               />
 
-              {/* Activity Timeline */}
-              <motion.section
-                initial={{ opacity: 0, y: 12 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1], delay: 0.35 }}
-                className="mt-6 rounded-xl border bg-card p-4"
-              >
-                <h2 className="text-lg font-semibold mb-4">Activity Timeline</h2>
-                <ActivityTimeline items={[
-                  ...notes.map(n => ({ id: n.id, type: 'note' as const, title: n.team_members?.name ? `Note by ${n.team_members.name}` : 'Note', description: n.content, date: n.created_at })),
-                  ...tasks.map(t => ({ id: t.id, type: 'task' as const, title: t.title, description: t.completed_at ? 'Completed' : t.due_date ? `Due ${new Date(t.due_date).toLocaleDateString()}` : undefined, date: t.created_at })),
-                  ...properties.map(p => ({ id: p.id, type: 'property' as const, title: `Property: ${p.resort_name}`, description: p.status === 'paid_off' ? 'Paid off' : undefined, date: p.created_at })),
-                ]} />
-              </motion.section>
-
-{/* §11.4 Tasks & Appointments — now inline after Activity Timeline */}
+{/* §11.4 Tasks & Appointments */}
             <motion.section
               initial={{ opacity: 0, y: 12 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1], delay: 0.4 }}
+              transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1], delay: 0.35 }}
               id="tasks"
               className="rounded-xl border bg-card section-accent-green"
             >
@@ -1102,6 +1087,21 @@ export default function Client360Page() {
                   )}
                 </div>
             </motion.section>
+
+              {/* Activity Timeline */}
+              <motion.section
+                initial={{ opacity: 0, y: 12 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1], delay: 0.4 }}
+                className="mt-6 rounded-xl border bg-card p-4"
+              >
+                <h2 className="text-lg font-semibold mb-4">Activity Timeline</h2>
+                <ActivityTimeline items={[
+                  ...notes.map(n => ({ id: n.id, type: 'note' as const, title: n.team_members?.name ? `Note by ${n.team_members.name}` : 'Note', description: n.content, date: n.created_at })),
+                  ...tasks.map(t => ({ id: t.id, type: 'task' as const, title: t.title, description: t.completed_at ? 'Completed' : t.due_date ? `Due ${new Date(t.due_date).toLocaleDateString()}` : undefined, date: t.created_at })),
+                  ...properties.map(p => ({ id: p.id, type: 'property' as const, title: `Property: ${p.resort_name}`, description: p.status === 'paid_off' ? 'Paid off' : undefined, date: p.created_at })),
+                ]} />
+              </motion.section>
           </div>
         </div>
 
