@@ -195,6 +195,8 @@ export function filterClients<T extends ClientWithHealth>(
     if (filters.stage) {
       if (filters.stage === 'active') {
         if (c.stage === 'resolved') return false
+      } else if (filters.stage === 'unresponsive') {
+        if (!c.is_unresponsive) return false
       } else if (c.stage !== filters.stage) {
         return false
       }
