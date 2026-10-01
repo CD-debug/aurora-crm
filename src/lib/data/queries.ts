@@ -32,10 +32,10 @@ export async function getDashboardData(): Promise<DashboardData> {
     >
   >
   const properties = propsRes.data as Array<Pick<Property, 'status'>>
-  const recentlyViewed = (recentRes.data as Array<{ client_id: string; viewed_at: string; clients: { name: string }[] }>).map((r) => ({
+  const recentlyViewed = (recentRes.data as Array<{ client_id: string; viewed_at: string; clients: { name: string } | { name: string }[] }>).map((r) => ({
     client_id: r.client_id,
     viewed_at: r.viewed_at,
-    client_name: r.clients[0]?.name ?? '',
+    client_name: Array.isArray(r.clients) ? r.clients[0]?.name ?? '' : r.clients?.name ?? '',
   }))
 
   const stage_counts = Object.fromEntries(STAGES.map((s) => [s, 0])) as Record<PipelineStage, number>
