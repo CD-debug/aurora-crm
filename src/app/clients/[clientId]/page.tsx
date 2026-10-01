@@ -211,10 +211,14 @@ export default function Client360Page() {
     } as Parameters<typeof createProperty>[0]
     try {
       if (editingProperty) {
+        console.log('Updating property with payload:', { id: editingProperty.id, status: payload.status, paid_off_at: payload.paid_off_at })
         await updateProperty(editingProperty.id, clientId, payload)
+        console.log('Property updated successfully')
         toast.success('Property updated')
       } else {
+        console.log('Creating property with payload:', { status: payload.status, paid_off_at: payload.paid_off_at })
         await createProperty(payload)
+        console.log('Property created successfully')
         toast.success('Property added')
       }
       await invalidateAfterMutation(queryClient, clientId)
@@ -222,6 +226,7 @@ export default function Client360Page() {
       setPropertySheetOpen(false)
       setPropertyForm(EMPTY_PROPERTY_FORM)
     } catch (err) {
+      console.error('Property save error:', err)
       toast.error(err instanceof Error ? err.message : "Couldn't save this property. Check the details and try again.")
     } finally {
       setPropertySaving(false)
