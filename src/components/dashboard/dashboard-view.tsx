@@ -2,7 +2,6 @@
 
 import Link from 'next/link'
 import { motion } from 'framer-motion'
-import { format } from 'date-fns'
 import { ClientHealthBadge, ThemeToggle } from '@/components/shared'
 import { Stagger, FadeUp, CountUp } from '@/components/shared/motion'
 import type { DashboardData } from '@/lib/data/types'
@@ -54,12 +53,7 @@ function RecentRow({ client, index }: {
         href={`/clients/${client.client_id}`}
         className="flex items-center justify-between p-3 rounded-lg hover:bg-muted/40 transition-colors group"
       >
-        <div className="min-w-0">
-          <p className="font-medium text-sm truncate group-hover:text-foreground transition-colors">{client.client_name}</p>
-          <p className="text-xs text-muted-foreground">
-            Viewed {format(new Date(client.viewed_at), 'MMM d, yyyy h:mm a')}
-          </p>
-        </div>
+        <p className="font-medium text-sm truncate group-hover:text-foreground transition-colors">{client.client_name}</p>
       </Link>
     </motion.div>
   )
