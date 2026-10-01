@@ -83,7 +83,7 @@ function ClientsPageContent() {
 
   // --- Derived list ----------------------------------------------------------
   const visible = useMemo(() => {
-    const filtered = filterClients(clients, filters)
+    const filtered = filterClients(clients, filters).filter((c) => !c.is_unresponsive)
     const dir = sortDir === 'asc' ? 1 : -1
     return [...filtered].sort((a, b) => {
       const av = a[sortKey] ?? ''

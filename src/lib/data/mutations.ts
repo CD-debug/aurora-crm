@@ -90,6 +90,21 @@ export async function updateClientStage(clientId: string, stage: PipelineStage) 
   revalidate(clientId)
 }
 
+export async function setClientUnresponsive(clientId: string, isUnresponsive: boolean) {
+  const { supabase } = await requireUser()
+
+  const { error } = await supabase
+    .from('clients')
+    .update(
+      isUnresponsive
+        ? { is_unresponsive: true, unresponsive_since: new Date().toISOString() }
+        : { is_unresponsive: false, unresponsive_since: null }
+    )
+    .eq('id', clientId)
+  if (error) fail(error)
+  revalidate(clientId)
+}
+
 export async function deleteClient(clientId: string) {
   const { supabase } = await requireUser()
   const { error } = await supabase.from('clients').delete().eq('id', clientId)

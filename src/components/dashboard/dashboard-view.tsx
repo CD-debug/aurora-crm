@@ -80,6 +80,8 @@ export function DashboardView({ data }: { data: DashboardData }) {
     { stage: 'resolved', label: STAGE_LABELS.resolved, color: 'var(--chart-5)' },
   ].map((s) => ({ ...s, count: data.stage_counts[s.stage as keyof typeof data.stage_counts] ?? 0 }))
 
+  const unresponsiveData = { stage: 'unresponsive', label: 'Unresponsive', color: 'var(--muted-foreground)', count: data.unresponsive_count }
+
   const noData = data.total_cases === 0
 
   return (
@@ -174,6 +176,15 @@ export function DashboardView({ data }: { data: DashboardData }) {
                       />
                     ) : null
                   })}
+                  {unresponsiveData.count > 0 && (
+                    <motion.div
+                      initial={{ scaleX: 0 }}
+                      animate={{ scaleX: 1 }}
+                      transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1], delay: 0.5 }}
+                      className="h-full origin-left"
+                      style={{ width: `${data.total_cases > 0 ? (unresponsiveData.count / data.total_cases) * 100 : 0}%`, backgroundColor: unresponsiveData.color }}
+                    />
+                  )}
                 </div>
                 <div className="mt-5 grid grid-cols-2 gap-x-6 gap-y-3">
                   {stageData.map((s) => (
@@ -190,6 +201,16 @@ export function DashboardView({ data }: { data: DashboardData }) {
                       <span className="text-sm font-mono tabular-nums w-8 text-right">{s.count}</span>
                     </Link>
                   ))}
+                  {unresponsiveData.count > 0 && (
+                    <div className="flex items-center gap-2.5 rounded-md px-2 py-1.5 -mx-2">
+                      <div className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: unresponsiveData.color }} />
+                      <span className="text-sm font-medium text-muted-foreground">{unresponsiveData.label}</span>
+                      <span className="ml-auto text-sm font-mono tabular-nums text-muted-foreground">
+                        {data.total_cases > 0 ? `${Math.round((unresponsiveData.count / data.total_cases) * 100)}%` : '0%'}
+                      </span>
+                      <span className="text-sm font-mono tabular-nums w-8 text-right">{unresponsiveData.count}</span>
+                    </div>
+                  )}
                 </div>
               </>
             )}

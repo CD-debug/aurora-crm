@@ -40,6 +40,9 @@ export interface Client {
   address: string | null
   phone2: string | null
   retainer_fee: number | null
+  // Unresponsive tracking (20260930 migration)
+  is_unresponsive: boolean
+  unresponsive_since: string | null
 }
 
 /** Row of the clients_with_health view: Client + computed fields. */
@@ -50,6 +53,7 @@ export interface ClientWithHealth extends Client {
   next_task_due: string | null // nearest open task due date (today or later)
   health_status: HealthStatus
   current_annual_maintenance_fee: number | null // sum of maintenance_fee for active properties
+  is_unresponsive: boolean
 }
 
 export interface Property {
@@ -138,6 +142,7 @@ export interface DashboardData {
   avg_days_to_resolution: number | null
   resolution_rate: number
   stage_counts: Record<PipelineStage, number>
+  unresponsive_count: number
   attention: Array<{
     id: string
     name: string

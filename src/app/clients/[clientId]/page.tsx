@@ -31,7 +31,7 @@ import { fetchClient360, fetchTeamMembers, invalidateAfterMutation } from '@/lib
 import { queryKeys } from '@/lib/data/query-keys'
 import {
   createNote, deleteNote, updateNote, toggleNotePin, createProperty, updateProperty, setPropertyPaidOff, deleteProperty,
-  createTask, setTaskCompleted, deleteTask, updateClientStage, updateClient, saveClosingData,
+  createTask, setTaskCompleted, deleteTask, updateClientStage, updateClient, saveClosingData, setClientUnresponsive,
 } from '@/lib/data/mutations'
 import {
   daysSince, maintenanceProjection, isDueSoon, stagePercent, taskStatus, STAGE_LABELS,
@@ -243,6 +243,17 @@ export default function Client360Page() {
       setPayoffProperty(null)
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Couldn't update this property.")
+    }
+  }
+
+  // --- Unresponsive ------------------------------------------------------------
+  const handleToggleUnresponsive = async () => {
+    try {
+      await setClientUnresponsive(client.id, !client.is_unresponsive)
+      await invalidateAfterMutation(queryClient, clientId)
+      toast.success(client.is_unresponsive ? 'Client marked responsive' : 'Client marked unresponsive')
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Couldn't update unresponsive status.")
     }
   }
 
@@ -1103,6 +1114,45 @@ export default function Client360Page() {
                   ...tasks.map(t => ({ id: t.id, type: 'task' as const, title: t.title, description: t.completed_at ? 'Completed' : t.due_date ? `Due ${new Date(t.due_date).toLocaleDateString()}` : undefined, date: t.created_at })),
                   ...properties.map(p => ({ id: p.id, type: 'property' as const, title: `Property: ${p.resort_name}`, description: p.status === 'paid_off' ? 'Paid off' : undefined, date: p.created_at })),
                 ]} />
+              </motion.section>
+
+              {/* Unresponsive */}
+              <motion.section
+                initial={{ opacity: 0, y: 12 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1], delay: 0.45 }}
+                id="unresponsive"
+                className="mt-6 rounded-xl border bg-card p-4 section-accent-red"
+              >
+                <h2 className="text-lg font-semibold mb-4">Unresponsive</h2>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium">Mark as Unresponsive</p>
+                    <p className="text-xs text-muted-foreground mt-0.5">Stage will not change. Client is hidden from the pipeline.</p>
+                    {client.is_unresponsive && client.unresponsive_since && (
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Unresponsive for {Math.max(0, Math.floor((Date.now() - new Date(client.unresponsive_since).getTime()) / (1000 * 60 * 60 * 24)))} days
+                      </p>
+                    )}
+                  </div>
+                  <button
+                    type="button"
+                    role="switch"
+                    aria-checked={client.is_unresponsive}
+                    onClick={() => handleToggleUnresponsive()}
+                    className={cn(
+                      'relative inline-flex h-6 w-11 items-center rounded-full transition-colors',
+                      client.is_unresponsive ? 'bg-primary' : 'bg-muted-foreground/30'
+                    )}
+                  >
+                    <span
+                      className={cn(
+                        'inline-block h-4 w-4 transform rounded-full bg-white transition-transform',
+                        client.is_unresponsive ? 'translate-x-6' : 'translate-x-1'
+                      )}
+                    />
+                  </button>
+                </div>
               </motion.section>
           </div>
         </div>

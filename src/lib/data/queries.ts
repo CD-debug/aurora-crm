@@ -22,13 +22,20 @@ export async function getDashboardData(): Promise<DashboardData> {
   const clients = clientsRes.data as Array<
     Pick<
       ClientWithHealth,
-      'id' | 'name' | 'stage' | 'health_status' | 'case_opened_at' | 'resolved_at' | 'last_contact_at' | 'overdue_task_count'
+      'id' | 'name' | 'stage' | 'health_status' | 'case_opened_at' | 'resolved_at' | 'last_contact_at' | 'overdue_task_count' | 'is_unresponsive'
     >
   >
   const properties = propsRes.data as Array<Pick<Property, 'status' | 'value_eliminated' | 'loan_balance' | 'paid_off_at'>>
 
   const stage_counts = Object.fromEntries(STAGES.map((s) => [s, 0])) as Record<PipelineStage, number>
-  for (const c of clients) stage_counts[c.stage] += 1
+  let unresponsive_count = 0
+  for (const c of clients) {
+    if (c.is_unresponsive) {
+      unresponsive_count += 1
+    } else {
+      stage_counts[c.stage] += 1
+    }
+  }
 
   const resolved = clients.filter((c) => c.stage === 'resolved')
   const withResolutionTime = resolved.filter((c) => c.resolved_at)
@@ -67,6 +74,7 @@ export async function getDashboardData(): Promise<DashboardData> {
     avg_days_to_resolution: avgDays,
     resolution_rate: clients.length > 0 ? (resolved.length / clients.length) * 100 : 0,
     stage_counts,
+    unresponsive_count,
     attention: clients
       .filter((c) => c.health_status !== 'on_track')
       .sort((a, b) => (a.health_status === b.health_status ? 0 : a.health_status === 'stalled' ? -1 : 1))
