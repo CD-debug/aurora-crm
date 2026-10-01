@@ -12,7 +12,7 @@ export async function getDashboardData(): Promise<DashboardData> {
   const [clientsRes, propsRes] = await Promise.all([
     supabase
       .from('clients_with_health')
-      .select('id, name, stage, health_status, case_opened_at, resolved_at, last_contact_at, overdue_task_count'),
+      .select('id, name, stage, health_status, case_opened_at, resolved_at, last_contact_at, overdue_task_count, is_unresponsive'),
     supabase.from('properties').select('status, value_eliminated, loan_balance, paid_off_at'),
   ])
 
