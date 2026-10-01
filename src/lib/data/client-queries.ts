@@ -120,22 +120,55 @@ export interface ReceivableRow {
 }
 
 export async function fetchReceivables(supabase: SupabaseClient): Promise<ReceivableRow[]> {
-  const { data, error } = await supabase
+  const { data: closingData, error: closingError } = await supabase
     .from('closing_data')
-    .select('*, properties!inner(resort_name, client_id, clients!inner(name)), team_members(name)')
+    .select('*')
     .not('resort_settlement', 'is', null)
-    .order('resort_settlement', { ascending: false })
-  if (error) throw new Error(`Couldn't load receivables: ${error.message}`)
-  return (data as Array<Record<string, unknown> & { properties: { resort_name: string; client_id: string }; clients: { name: string }; team_members: { name: string } | null }>).map((row) => ({
-    property_id: row.property_id as string,
-    resort_name: row.properties.resort_name,
-    client_id: row.properties.client_id,
-    client_name: row.clients.name,
-    resort_settlement: row.resort_settlement as number | null,
-    invoiced: row.invoiced as number | null,
-    disposition: row.disposition as Disposition | null,
-    team_member_id: row.team_member_id as string | null,
-    team_member_name: row.team_members?.name ?? null,
-    is_issued: row.is_issued as boolean,
-  }))
+  if (closingError) throw new Error(`Couldn't load receivables: ${closingError.message}`)
+  if (!closingData || closingData.length === 0) return []
+
+  const propertyIds = closingData.map((cd) => cd.property_id)
+  const { data: properties, error: propsError } = await supabase
+    .from('properties')
+    .select('id, resort_name, client_id')
+    .in('id', propertyIds)
+  if (propsError) throw new Error(`Couldn't load properties: ${propsError.message}`)
+
+  const clientIds = [...new Set(properties.map((p) => p.client_id))]
+  const { data: clients, error: clientsError } = await supabase
+    .from('clients')
+    .select('id, name')
+    .in('id', clientIds)
+  if (clientsError) throw new Error(`Couldn't load clients: ${clientsError.message}`)
+
+  const teamMemberIds = [...new Set(closingData.map((cd) => cd.team_member_id).filter(Boolean))]
+  const { data: teamMembers, error: teamError } = await supabase
+    .from('team_members')
+    .select('id, name')
+    .in('id', teamMemberIds)
+  if (teamError) throw new Error(`Couldn't load team members: ${teamError.message}`)
+
+  const propsMap = new Map(properties.map((p) => [p.id, p]))
+  const clientsMap = new Map(clients.map((c) => [c.id, c]))
+  const teamMap = new Map(teamMembers.map((t) => [t.id, t]))
+
+  return closingData
+    .map((cd) => {
+      const prop = propsMap.get(cd.property_id)
+      const client = prop ? clientsMap.get(prop.client_id) : null
+      const team = cd.team_member_id ? teamMap.get(cd.team_member_id) : null
+      return {
+        property_id: cd.property_id,
+        resort_name: prop?.resort_name ?? '',
+        client_id: prop?.client_id ?? '',
+        client_name: client?.name ?? '',
+        resort_settlement: cd.resort_settlement,
+        invoiced: cd.invoiced,
+        disposition: cd.disposition,
+        team_member_id: cd.team_member_id,
+        team_member_name: team?.name ?? null,
+        is_issued: cd.is_issued,
+      }
+    })
+    .sort((a, b) => (b.resort_settlement ?? 0) - (a.resort_settlement ?? 0))
 }
