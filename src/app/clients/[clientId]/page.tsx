@@ -70,12 +70,16 @@ export default function Client360Page() {
   // --- Recently Viewed tracking -----------------------------------------------
   useEffect(() => {
     if (data?.client) {
-      supabase
-        .from('recently_viewed')
-        .upsert({ client_id: clientId }, { onConflict: 'user_id,client_id' })
-        .then(({ error }) => {
-          if (error) console.error('Failed to record recently viewed:', error)
-        })
+      supabase.auth.getUser().then(({ data: { user } }) => {
+        if (user) {
+          supabase
+            .from('recently_viewed')
+            .upsert({ user_id: user.id, client_id: clientId }, { onConflict: 'user_id,client_id' })
+            .then(({ error }) => {
+              if (error) console.error('Failed to record recently viewed:', error)
+            })
+        }
+      })
     }
   }, [data?.client, clientId, supabase])
 
