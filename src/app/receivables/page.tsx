@@ -37,7 +37,7 @@ function ReceivablesPageContent() {
   const [supabase] = useState(() => createClient())
 
   const { data: receivables = [], isLoading, isError, error } = useQuery({
-    queryKey: queryKeys.clients.all,
+    queryKey: queryKeys.receivables.all,
     queryFn: () => fetchReceivables(supabase),
   })
 

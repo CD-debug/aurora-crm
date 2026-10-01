@@ -6,6 +6,9 @@ export const queryKeys = {
     detail: (id: string) => ['clients', 'detail', id] as const,
     search: (q: string) => ['clients', 'search', q] as const,
   },
+  receivables: {
+    all: ['receivables'] as const,
+  },
   properties: {
     all: ['properties'] as const,
     search: (q: string) => ['properties', 'search', q] as const,
