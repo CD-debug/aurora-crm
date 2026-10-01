@@ -2,11 +2,11 @@
 -- 1:1 with properties (property_id PK with CASCADE delete).
 
 create table if not exists public.closing_data (
-  property_id text primary key references public.properties(id) on delete cascade,
+  property_id uuid primary key references public.properties(id) on delete cascade,
   resort_settlement numeric(12,2),
   invoiced numeric(12,2),
   disposition text,
-  updated_at text not null default (datetime('now'))
+  updated_at text not null default (now()::text)
 );
 
 do $$
