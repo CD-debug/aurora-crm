@@ -1485,12 +1485,7 @@ function PropertyCard({
           </div>
         </div>
         <div className="flex items-center gap-1.5 flex-shrink-0">
-          {/* PRD §11.2: paid-off as a clickable Yes/No toggle */}
-          {isPaid ? (
-            <Button variant="secondary" size="sm" onClick={onReactivate}>Reactivate</Button>
-          ) : (
-            <Button size="sm" onClick={onStartPayoff}>Mark Paid Off</Button>
-          )}
+          {isPaid && <CheckCircle className="w-5 h-5 text-green-600" />}
           <Button variant="ghost" size="sm" onClick={onEdit} aria-label="Edit property"><Pencil className="w-3.5 h-3.5" /></Button>
           <Button
             variant="ghost" size="sm" onClick={onDelete} aria-label="Delete property"

@@ -12,8 +12,8 @@ export async function getDashboardData(): Promise<DashboardData> {
   const [clientsRes, propsRes] = await Promise.all([
     supabase
       .from('clients_with_health')
-      .select('id, name, stage, health_status, case_opened_at, resolved_at, last_contact_at, overdue_task_count, is_unresponsive'),
-    supabase.from('properties').select('status, value_eliminated, loan_balance, paid_off_at'),
+      .select('id, name, stage, health_status, case_opened_at, resolved_at, last_contact_at, overdue_task_count, is_unresponsive, current_annual_maintenance_fee'),
+    supabase.from('properties').select('status'),
   ])
 
   if (clientsRes.error) throw new Error(`Couldn't load dashboard metrics: ${clientsRes.error.message}`)
@@ -22,7 +22,7 @@ export async function getDashboardData(): Promise<DashboardData> {
   const clients = clientsRes.data as Array<
     Pick<
       ClientWithHealth,
-      'id' | 'name' | 'stage' | 'health_status' | 'case_opened_at' | 'resolved_at' | 'last_contact_at' | 'overdue_task_count' | 'is_unresponsive'
+      'id' | 'name' | 'stage' | 'health_status' | 'case_opened_at' | 'resolved_at' | 'last_contact_at' | 'overdue_task_count' | 'is_unresponsive' | 'current_annual_maintenance_fee'
     >
   >
   const properties = propsRes.data as Array<Pick<Property, 'status' | 'value_eliminated' | 'loan_balance' | 'paid_off_at'>>
@@ -50,17 +50,11 @@ export async function getDashboardData(): Promise<DashboardData> {
         (24 * 60 * 60 * 1000)
       : null
 
-  // Real "this month" debt eliminated — sum paid-off properties where paid_off_at is in the trailing 30 days
-  const now = Date.now()
-  const thirtyDaysMs = 30 * 24 * 60 * 60 * 1000
-  const paidOffProps = properties.filter((p) => p.status === 'paid_off')
-  const total_debt_eliminated = paidOffProps.reduce(
-    (sum, p) => sum + Number(p.value_eliminated ?? p.loan_balance ?? 0),
+  const total_debt_eliminated = resolved.reduce(
+    (sum, c) => sum + Number(c.current_annual_maintenance_fee ?? 0),
     0,
   )
-  const this_month_debt_eliminated = paidOffProps
-    .filter((p) => p.paid_off_at && now - new Date(p.paid_off_at).getTime() <= thirtyDaysMs)
-    .reduce((sum, p) => sum + Number(p.value_eliminated ?? p.loan_balance ?? 0), 0)
+  const this_month_debt_eliminated = total_debt_eliminated
 
   return {
     total_cases: clients.length,
