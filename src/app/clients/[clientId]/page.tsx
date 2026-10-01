@@ -25,18 +25,18 @@ import { Badge } from '@/components/ui/badge'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription, SheetFooter } from '@/components/ui/sheet'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog'
-import { NavRail, MobileNavBar, MobileNavDrawer, Breadcrumb, AuroraArcStepper, ClientHealthBadge, StageBadge, TaskStatusBadge, CurrencyInput, YesNoToggle, ConditionalField, PhoneInput, SsnInput } from '@/components/shared'
+import { NavRail, MobileNavBar, MobileNavDrawer, Breadcrumb, AuroraArcStepper, ClientHealthBadge, StageBadge, TaskStatusBadge, CurrencyInput, YesNoToggle, ConditionalField, PhoneInput, SsnInput, ClosingSection, ClosingEditSheet } from '@/components/shared'
 import { createClient } from '@/lib/supabase/client'
 import { fetchClient360, fetchTeamMembers, invalidateAfterMutation } from '@/lib/data/client-queries'
 import { queryKeys } from '@/lib/data/query-keys'
 import {
   createNote, deleteNote, updateNote, toggleNotePin, createProperty, updateProperty, setPropertyPaidOff, deleteProperty,
-  createTask, setTaskCompleted, deleteTask, updateClientStage, updateClient,
+  createTask, setTaskCompleted, deleteTask, updateClientStage, updateClient, saveClosingData,
 } from '@/lib/data/mutations'
 import {
   daysSince, maintenanceProjection, isDueSoon, stagePercent, taskStatus, STAGE_LABELS,
 } from '@/lib/data/domain'
-import type { NoteChannel, PipelineStage, Property } from '@/lib/data/types'
+import type { NoteChannel, PipelineStage, Property, Disposition } from '@/lib/data/types'
 import { cn } from '@/lib/utils'
 
 const CHANNEL_META: Record<NoteChannel, { label: string; icon: typeof Mail }> = {
@@ -244,6 +244,18 @@ export default function Client360Page() {
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Couldn't update this property.")
     }
+  }
+
+  // --- Closing data ------------------------------------------------------------
+  const [closingSheetOpen, setClosingSheetOpen] = useState(false)
+
+  const handleSaveClosing = async (propertyId: string, closingFields: { resort_settlement: string; invoiced: string; disposition: Disposition | null }) => {
+    await saveClosingData(propertyId, clientId, {
+      resort_settlement: closingFields.resort_settlement ? Number(closingFields.resort_settlement.replace(/,/g, '')) : null,
+      invoiced: closingFields.invoiced ? Number(closingFields.invoiced.replace(/,/g, '')) : null,
+      disposition: closingFields.disposition,
+    })
+    await invalidateAfterMutation(queryClient, clientId)
   }
 
   const handleReactivate = async (p: Property) => {
@@ -935,6 +947,29 @@ export default function Client360Page() {
                   )}
                 </div>
               </motion.section>
+
+              {/* Closing */}
+              <motion.section
+                initial={{ opacity: 0, y: 16 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1], delay: 0.32 }}
+                id="closing"
+                className="rounded-xl border bg-card scroll-mt-24 section-accent-teal"
+              >
+                <ClosingSection
+                  properties={properties}
+                  closingData={data?.closingData ?? []}
+                  onEdit={() => setClosingSheetOpen(true)}
+                />
+              </motion.section>
+
+              <ClosingEditSheet
+                open={closingSheetOpen}
+                onOpenChange={setClosingSheetOpen}
+                properties={properties}
+                closingData={data?.closingData ?? []}
+                onSave={handleSaveClosing}
+              />
 
               {/* Activity Timeline */}
               <motion.section

@@ -8,3 +8,5 @@ export { PhoneInput, CurrencyInput, SsnInput, YesNoToggle, ConditionalField } fr
 export { ClientHealthBadge, TaskStatusBadge, StageBadge } from './badges'
 export { Toaster } from './toaster'
 export { ThemeToggle } from './ThemeToggle'
+export { ClosingSection } from './ClosingSection'
+export { ClosingEditSheet } from './ClosingEditSheet'

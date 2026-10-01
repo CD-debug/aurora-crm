@@ -8,6 +8,7 @@ export type HealthStatus = 'on_track' | 'at_risk' | 'stalled'
 export type TaskStatus = 'upcoming' | 'overdue' | 'completed' // derived, never stored
 export type NoteChannel = 'email' | 'phone' | 'text'
 export type PropertyStatus = 'active' | 'paid_off'
+export type Disposition = 'Sent' | 'Collected' | 'Settled' | 'Paid'
 
 export interface TeamMember {
   id: string
@@ -75,6 +76,13 @@ export interface Property {
   maintenance_fees_billed: number | null
 }
 
+export interface ClosingData {
+  property_id: string
+  resort_settlement: number | null
+  invoiced: number | null
+  disposition: Disposition | null
+}
+
 export interface Note {
   id: string
   client_id: string
@@ -110,6 +118,7 @@ export interface TaskWithClient extends Task {
 export interface Client360 {
   client: ClientWithHealth
   properties: Property[]
+  closingData: ClosingData[]
   notes: Note[]
   tasks: Task[]
 }

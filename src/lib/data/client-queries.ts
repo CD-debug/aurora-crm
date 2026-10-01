@@ -8,7 +8,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type { QueryClient } from '@tanstack/react-query'
 import { queryKeys } from './query-keys'
-import type { Client360, ClientWithHealth, Note, Property, Task, TaskWithClient, TeamMember } from './types'
+import type { Client360, ClientWithHealth, ClosingData, Note, Property, Task, TaskWithClient, TeamMember } from './types'
 
 export async function searchProperties(
   supabase: SupabaseClient,
@@ -67,19 +67,22 @@ export async function searchClients(
 }
 
 export async function fetchClient360(supabase: SupabaseClient, clientId: string): Promise<Client360> {
-  const [clientRes, propsRes, notesRes, tasksRes] = await Promise.all([
+  const [clientRes, propsRes, closingRes, notesRes, tasksRes] = await Promise.all([
     supabase.from('clients_with_health').select('*').eq('id', clientId).single(),
     supabase.from('properties').select('*').eq('client_id', clientId).order('created_at', { ascending: true }),
+    supabase.from('closing_data').select('*'),
     supabase.from('notes').select('*, team_members(name)').eq('client_id', clientId).order('pinned', { ascending: false }).order('created_at', { ascending: false }),
     supabase.from('tasks').select('*, team_members(name)').eq('client_id', clientId).order('due_date', { ascending: true }),
   ])
   if (clientRes.error) throw new Error(`Couldn't load this client: ${clientRes.error.message}`)
   if (propsRes.error) throw new Error(`Couldn't load properties: ${propsRes.error.message}`)
+  if (closingRes.error) throw new Error(`Couldn't load closing data: ${closingRes.error.message}`)
   if (notesRes.error) throw new Error(`Couldn't load notes: ${notesRes.error.message}`)
   if (tasksRes.error) throw new Error(`Couldn't load tasks: ${tasksRes.error.message}`)
   return {
     client: clientRes.data as ClientWithHealth,
     properties: propsRes.data as Property[],
+    closingData: closingRes.data as ClosingData[],
     notes: notesRes.data as Note[],
     tasks: tasksRes.data as Task[],
   }

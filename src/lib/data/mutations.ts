@@ -11,7 +11,7 @@ import { z } from 'zod'
 import { createServerClient } from '@/lib/supabase/server'
 import { findDuplicates } from './domain'
 import { clientInput } from './schemas'
-import type { Client, Note, TeamMember, PipelineStage, Property, Task } from './types'
+import type { Client, Note, TeamMember, PipelineStage, Property, Task, Disposition } from './types'
 
 export async function requireUser() {
   const supabase = await createServerClient()
@@ -191,6 +191,27 @@ export async function setPropertyPaidOff(
 export async function deleteProperty(propertyId: string, clientId: string) {
   const { supabase } = await requireUser()
   const { error } = await supabase.from('properties').delete().eq('id', propertyId)
+  if (error) fail(error)
+  revalidate(clientId)
+}
+
+// ---------------------------------------------------------------------------
+// Closing data — per-property settlement tracking (Closing section)
+// ---------------------------------------------------------------------------
+
+const closingInput = z.object({
+  resort_settlement: money,
+  invoiced: money,
+  disposition: z.enum(['Sent', 'Collected', 'Settled', 'Paid']).nullable().optional(),
+})
+
+export async function saveClosingData(propertyId: string, clientId: string, input: z.input<typeof closingInput>) {
+  const { supabase } = await requireUser()
+  const data = closingInput.parse(input)
+
+  const { error } = await supabase
+    .from('closing_data')
+    .upsert({ property_id: propertyId, ...data, updated_at: new Date().toISOString() })
   if (error) fail(error)
   revalidate(clientId)
 }
