@@ -764,8 +764,10 @@ export default function TasksPage() {
     <Suspense fallback={
       <div className="flex h-screen bg-background">
         <NavRail />
-        <main className="flex-1 ml-16 p-8">
-          <div className="max-w-5xl mx-auto px-4 py-6 space-y-3">
+        <MobileNavBar />
+        <MobileNavDrawer />
+        <main className="flex-1 lg:ml-16 overflow-auto pb-16 lg:pb-0">
+          <div className="container mx-auto px-4 py-6">
             {Array.from({ length: 5 }).map((_, i) => (
               <div key={i} className="h-12 rounded-md bg-muted/60 animate-pulse" />
             ))}
