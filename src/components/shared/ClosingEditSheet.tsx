@@ -57,7 +57,7 @@ export function ClosingEditSheet({ open, onOpenChange, properties, closingData, 
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent side="right" className="max-w-lg">
+      <SheetContent side="right" className="max-w-xl">
         <SheetHeader>
           <SheetTitle>Edit Closing</SheetTitle>
           <SheetDescription>Enter settlement, invoiced amounts, and disposition for each property.</SheetDescription>
@@ -90,7 +90,7 @@ export function ClosingEditSheet({ open, onOpenChange, properties, closingData, 
                     value={data.disposition ?? ''}
                     onValueChange={(v) => setField(p.id, 'disposition', (v || null) as Disposition | null)}
                   >
-                    <SelectTrigger>
+                    <SelectTrigger className="w-[140px]">
                       <SelectValue placeholder="Select..." />
                     </SelectTrigger>
                     <SelectContent>
