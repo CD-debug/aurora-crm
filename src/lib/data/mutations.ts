@@ -133,6 +133,7 @@ const propertyInput = z.object({
   fees_behind_amount: money,
   maintenance_fees_billed: money,
   status: z.enum(['active', 'paid_off']).optional(),
+  paid_off_at: z.string().datetime().nullable().optional(),
   document_reference: z
     .string()
     .trim()
