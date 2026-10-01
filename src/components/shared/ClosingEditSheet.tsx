@@ -62,7 +62,7 @@ export function ClosingEditSheet({ open, onOpenChange, properties, closingData, 
           <SheetTitle>Edit Closing</SheetTitle>
           <SheetDescription>Enter settlement, invoiced amounts, and disposition for each property.</SheetDescription>
         </SheetHeader>
-        <div className="flex-1 overflow-y-auto py-4 space-y-6">
+        <div className="flex-1 overflow-y-auto py-4 px-6 space-y-6">
           {properties.map((p) => {
             const data = getField(p.id)
             return (
