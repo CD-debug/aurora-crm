@@ -122,7 +122,7 @@ export interface ReceivableRow {
 export async function fetchReceivables(supabase: SupabaseClient): Promise<ReceivableRow[]> {
   const { data, error } = await supabase
     .from('closing_data')
-    .select('*, properties!inner(resort_name, client_id), clients!inner(name), team_members(name)')
+    .select('*, properties!inner(resort_name, client_id, clients!inner(name)), team_members(name)')
     .not('resort_settlement', 'is', null)
     .order('resort_settlement', { ascending: false })
   if (error) throw new Error(`Couldn't load receivables: ${error.message}`)
