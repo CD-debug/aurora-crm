@@ -31,10 +31,8 @@ begin
   select count(*) into at_risk from clients 
     where author_id = p_user_id and health_status = 'at_risk';
   
-  select coalesce(sum(value_eliminated), 0) into debt
-    from properties 
-    join clients on properties.client_id = clients.id
-    where clients.author_id = p_user_id and properties.status = 'paid_off';
+  -- debt eliminated now calculated via CAMF in TypeScript layer; SQL function returns 0
+  debt := 0;
   
   select count(*) into props from properties 
     join clients on properties.client_id = clients.id

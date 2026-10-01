@@ -131,16 +131,12 @@ export type MaintenanceProjection = ReturnType<typeof maintenanceProjection>
 
 export function financialProgress(properties: Property[]): FinancialProgress {
   let owed = 0
-  let eliminated = 0
   for (const p of properties) {
-    if (p.status === 'paid_off') {
-      eliminated += Number(p.value_eliminated ?? p.loan_balance ?? 0)
-    } else if (p.status === 'active') {
+    if (p.status === 'active') {
       owed += Number(p.loan_balance ?? 0)
     }
   }
-  const total = owed + eliminated
-  return { owed, eliminated, percent: total > 0 ? Math.round((eliminated / total) * 100) : 0 }
+  return { owed, eliminated: 0, percent: owed > 0 ? 0 : 0 }
 }
 
 /** Digits-only phone normalization for duplicate matching. */

@@ -30,7 +30,7 @@ import { createClient } from '@/lib/supabase/client'
 import { fetchClient360, fetchTeamMembers, invalidateAfterMutation } from '@/lib/data/client-queries'
 import { queryKeys } from '@/lib/data/query-keys'
 import {
-  createNote, deleteNote, updateNote, toggleNotePin, createProperty, updateProperty, setPropertyPaidOff, deleteProperty,
+  createNote, deleteNote, updateNote, toggleNotePin, createProperty, updateProperty, deleteProperty,
   createTask, setTaskCompleted, deleteTask, updateClientStage, updateClient, saveClosingData, setClientUnresponsive,
 } from '@/lib/data/mutations'
 import {
@@ -160,8 +160,6 @@ export default function Client360Page() {
   const [editingProperty, setEditingProperty] = useState<Property | null>(null)
   const [propertyForm, setPropertyForm] = useState(EMPTY_PROPERTY_FORM)
   const [propertySaving, setPropertySaving] = useState(false)
-  const [payoffProperty, setPayoffProperty] = useState<Property | null>(null)
-  const [payoffValue, setPayoffValue] = useState('')
 
   const openAddProperty = () => {
     setEditingProperty(null)
@@ -185,7 +183,7 @@ export default function Client360Page() {
       fees_current: p.fees_current,
       fees_behind_amount: p.fees_behind_amount != null ? String(p.fees_behind_amount) : '',
       maintenance_fees_billed: p.maintenance_fees_billed != null ? String(p.maintenance_fees_billed) : '',
-      paid_off: p.status === 'paid_off',
+      paid_off: p.paid_off_at != null,
     })
     setPropertySheetOpen(true)
   }
@@ -199,7 +197,7 @@ export default function Client360Page() {
       resort_location: propertyForm.resort_location,
       unit_number: propertyForm.unit_number || null,
       purchase_price: propertyForm.purchase_price ? Number(propertyForm.purchase_price.replace(/,/g, '')) : null,
-      loan_balance: propertyForm.paid_off ? null : (propertyForm.loan_balance ? Number(propertyForm.loan_balance.replace(/,/g, '')) : null),
+      loan_balance: propertyForm.loan_balance ? Number(propertyForm.loan_balance.replace(/,/g, '')) : null,
       maintenance_fee: propertyForm.maintenance_fee ? Number(propertyForm.maintenance_fee.replace(/,/g, '')) : null,
       fee_due_date: propertyForm.fee_due_date || null,
       document_reference: propertyForm.document_reference || null,
@@ -208,7 +206,6 @@ export default function Client360Page() {
       fees_current: propertyForm.fees_current,
       fees_behind_amount: propertyForm.fees_current ? null : (propertyForm.fees_behind_amount ? Number(propertyForm.fees_behind_amount.replace(/,/g, '')) : null),
       maintenance_fees_billed: propertyForm.maintenance_fees_billed ? Number(propertyForm.maintenance_fees_billed.replace(/,/g, '')) : null,
-      status: (propertyForm.paid_off ? 'paid_off' : 'active') as 'active' | 'paid_off',
     } as Parameters<typeof createProperty>[0]
     try {
       if (editingProperty) {
@@ -226,23 +223,6 @@ export default function Client360Page() {
       toast.error(err instanceof Error ? err.message : "Couldn't save this property. Check the details and try again.")
     } finally {
       setPropertySaving(false)
-    }
-  }
-
-  const confirmPayoff = async () => {
-    if (!payoffProperty) return
-    try {
-      await setPropertyPaidOff(
-        payoffProperty.id,
-        clientId,
-        true,
-        payoffValue ? Number(payoffValue) : null
-      )
-      await invalidateAfterMutation(queryClient, clientId)
-      toast.success(`${payoffProperty.resort_name} marked paid off`)
-      setPayoffProperty(null)
-    } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Couldn't update this property.")
     }
   }
 
@@ -268,16 +248,6 @@ export default function Client360Page() {
       team_member_id: closingFields.team_member_id,
     })
     await invalidateAfterMutation(queryClient, clientId)
-  }
-
-  const handleReactivate = async (p: Property) => {
-    try {
-      await setPropertyPaidOff(p.id, clientId, false)
-      await invalidateAfterMutation(queryClient, clientId)
-      toast.success(`${p.resort_name} reactivated`)
-    } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Couldn't update this property.")
-    }
   }
 
   const handleDeleteProperty = async (p: Property) => {
@@ -765,8 +735,6 @@ export default function Client360Page() {
                         key={p.id}
                         property={p}
                         onEdit={() => openEditProperty(p)}
-                        onStartPayoff={() => { setPayoffProperty(p); setPayoffValue(p.loan_balance != null ? String(p.loan_balance) : '') }}
-                        onReactivate={() => handleReactivate(p)}
                         onDelete={() => setDeleteTarget({ kind: 'property', id: p.id, label: p.resort_name })}
                       />
                     ))
@@ -1112,7 +1080,7 @@ export default function Client360Page() {
                 <ActivityTimeline items={[
                   ...notes.map(n => ({ id: n.id, type: 'note' as const, title: n.team_members?.name ? `Note by ${n.team_members.name}` : 'Note', description: n.content, date: n.created_at })),
                   ...tasks.map(t => ({ id: t.id, type: 'task' as const, title: t.title, description: t.completed_at ? 'Completed' : t.due_date ? `Due ${new Date(t.due_date).toLocaleDateString()}` : undefined, date: t.created_at })),
-                  ...properties.map(p => ({ id: p.id, type: 'property' as const, title: `Property: ${p.resort_name}`, description: p.status === 'paid_off' ? 'Paid off' : undefined, date: p.created_at })),
+                  ...properties.map(p => ({ id: p.id, type: 'property' as const, title: `Property: ${p.resort_name}`, description: undefined, date: p.created_at })),
                 ]} />
               </motion.section>
 
@@ -1281,28 +1249,6 @@ export default function Client360Page() {
           </SheetContent>
         </Sheet>
 
-        {/* Paid-off confirm (value eliminated) */}
-        <Sheet open={!!payoffProperty} onOpenChange={(open) => !open && setPayoffProperty(null)}>
-          <SheetContent side="right" className="w-full max-w-sm">
-            <SheetHeader>
-              <SheetTitle>Mark {payoffProperty?.resort_name} paid off?</SheetTitle>
-              <SheetDescription>
-                The eliminated value feeds the dashboard&apos;s debt-eliminated metric. It defaults to the loan balance — adjust if needed.
-              </SheetDescription>
-            </SheetHeader>
-            <div className="p-4 space-y-4">
-              <div className="space-y-2">
-                <label className="text-sm font-medium">Value Eliminated ($)</label>
-                <Input type="number" step="0.01" min="0" value={payoffValue} onChange={(e) => setPayoffValue(e.target.value)} />
-              </div>
-              <SheetFooter className="flex-row gap-2">
-                <Button variant="outline" className="flex-1" onClick={() => setPayoffProperty(null)}>Cancel</Button>
-                <Button className="flex-1" onClick={confirmPayoff}>Mark Paid Off</Button>
-              </SheetFooter>
-            </div>
-          </SheetContent>
-        </Sheet>
-
         {/* Edit client sheet */}
         <Sheet open={editOpen} onOpenChange={setEditOpen}>
           <SheetContent side="right" className="w-full max-w-md overflow-y-auto">
@@ -1425,15 +1371,13 @@ function StatCard({
 }
 
 function PropertyCard({
-  property: p, onEdit, onStartPayoff, onReactivate, onDelete,
+  property: p, onEdit, onDelete,
 }: {
   property: Property
   onEdit: () => void
-  onStartPayoff: () => void
-  onReactivate: () => void
   onDelete: () => void
 }) {
-  const isPaid = p.status === 'paid_off'
+  const isPaid = p.paid_off_at != null
   return (
     <div className={cn('p-4 hover:bg-muted/30 transition-all hover:shadow-sm group', isPaid && 'bg-surface-success/20')}>
       <div className="flex items-start justify-between gap-4">
@@ -1470,9 +1414,6 @@ function PropertyCard({
           <div className="flex flex-wrap gap-x-4 gap-y-1 mt-2 text-sm text-muted-foreground font-mono tabular-nums">
             {p.purchase_price != null && <span>Purchase: ${Number(p.purchase_price).toLocaleString()}</span>}
             {!isPaid && p.loan_balance != null && <span>Owed: ${Number(p.loan_balance).toLocaleString()}</span>}
-            {isPaid && p.value_eliminated != null && (
-              <span className="text-green-700">Eliminated: ${Number(p.value_eliminated).toLocaleString()}</span>
-            )}
             {p.maintenance_fees_billed != null && (
               <span>Billed to date: ${Number(p.maintenance_fees_billed).toLocaleString()}</span>
             )}

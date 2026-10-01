@@ -86,25 +86,6 @@ describe('daysSince', () => {
 })
 
 describe('financialProgress', () => {
-  it('sums owed from active properties and eliminated from paid_off', () => {
-    const props: Array<Pick<Property, 'status' | 'loan_balance' | 'value_eliminated'>> = [
-      { status: 'active', loan_balance: 10000, value_eliminated: null },
-      { status: 'paid_off', loan_balance: 0, value_eliminated: 5000 },
-    ]
-    const fin = financialProgress(props as unknown as Property[])
-    expect(fin.owed).toBe(10000)
-    expect(fin.eliminated).toBe(5000)
-    expect(fin.percent).toBe(33)
-  })
-
-  it('falls back to loan_balance when value_eliminated is null on a paid_off property', () => {
-    const props: Array<Pick<Property, 'status' | 'loan_balance' | 'value_eliminated'>> = [
-      { status: 'paid_off', loan_balance: 4000, value_eliminated: null },
-    ]
-    const fin = financialProgress(props as unknown as Property[])
-    expect(fin.eliminated).toBe(4000)
-  })
-
   it('handles all nulls cleanly', () => {
     const fin = financialProgress([])
     expect(fin).toEqual({ owed: 0, eliminated: 0, percent: 0 })

@@ -168,41 +168,6 @@ export async function updateProperty(propertyId: string, clientId: string, input
   revalidate(clientId)
 }
 
-/** PRD §11.2 paid-off Yes/No toggle. Eliminated value defaults to the loan balance. */
-export async function setPropertyPaidOff(
-  propertyId: string,
-  clientId: string,
-  paidOff: boolean,
-  valueEliminated?: number | null
-) {
-  const { supabase } = await requireUser()
-
-  let eliminated = valueEliminated ?? null
-  if (paidOff && eliminated == null) {
-    const { data: prop, error } = await supabase
-      .from('properties')
-      .select('loan_balance')
-      .eq('id', propertyId)
-      .single()
-    if (error) fail(error)
-    if (prop?.loan_balance == null) {
-      throw new Error('Add a loan balance before marking this property paid off.')
-    }
-    eliminated = Number(prop.loan_balance)
-  }
-
-  const { error } = await supabase
-    .from('properties')
-    .update(
-      paidOff
-        ? { status: 'paid_off', paid_off_at: new Date().toISOString(), value_eliminated: eliminated }
-        : { status: 'active', paid_off_at: null, value_eliminated: null }
-    )
-    .eq('id', propertyId)
-  if (error) fail(error)
-  revalidate(clientId)
-}
-
 export async function deleteProperty(propertyId: string, clientId: string) {
   const { supabase } = await requireUser()
   const { error } = await supabase.from('properties').delete().eq('id', propertyId)
