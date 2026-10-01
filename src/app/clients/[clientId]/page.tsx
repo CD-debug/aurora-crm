@@ -206,7 +206,7 @@ export default function Client360Page() {
       fees_current: propertyForm.fees_current,
       fees_behind_amount: propertyForm.fees_current ? null : (propertyForm.fees_behind_amount ? Number(propertyForm.fees_behind_amount.replace(/,/g, '')) : null),
       maintenance_fees_billed: propertyForm.maintenance_fees_billed ? Number(propertyForm.maintenance_fees_billed.replace(/,/g, '')) : null,
-      status: propertyForm.paid_off ? 'paid_off' : 'active',
+      status: 'active',
       paid_off_at: propertyForm.paid_off ? new Date().toISOString() : null,
     } as Parameters<typeof createProperty>[0]
     try {
