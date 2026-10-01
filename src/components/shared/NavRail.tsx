@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { cn } from '@/lib/utils'
-import { LayoutDashboard, Users, ListChecks, Settings, Menu, X, Search } from 'lucide-react'
+import { LayoutDashboard, Users, ListChecks, Settings, Menu, X, Search, Receipt } from 'lucide-react'
 import { GlobalSearch } from './GlobalSearch'
 import { AuroraMark } from './AuroraMark'
 import { usePathname } from 'next/navigation'
@@ -14,6 +14,7 @@ const navItems = [
   { href: '/', label: 'Dashboard', icon: LayoutDashboard },
   { href: '/clients', label: 'Clients', icon: Users },
   { href: '/tasks', label: 'Tasks', icon: ListChecks },
+  { href: '/receivables', label: 'Receivables', icon: Receipt },
   { href: '/settings', label: 'Settings', icon: Settings },
 ] as const
 

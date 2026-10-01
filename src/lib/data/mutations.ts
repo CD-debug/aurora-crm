@@ -232,6 +232,17 @@ export async function saveClosingData(propertyId: string, clientId: string, inpu
   revalidate(clientId)
 }
 
+export async function setClosingIssued(propertyId: string, clientId: string, isIssued: boolean) {
+  const { supabase } = await requireUser()
+
+  const { error } = await supabase
+    .from('closing_data')
+    .update({ is_issued: isIssued })
+    .eq('property_id', propertyId)
+  if (error) fail(error)
+  revalidate(clientId)
+}
+
 // ---------------------------------------------------------------------------
 // Notes (PRD §11.3 — channel is one of email / phone / text)
 // ---------------------------------------------------------------------------

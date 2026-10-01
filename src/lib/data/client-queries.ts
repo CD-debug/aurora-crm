@@ -8,7 +8,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type { QueryClient } from '@tanstack/react-query'
 import { queryKeys } from './query-keys'
-import type { Client360, ClientWithHealth, ClosingData, Note, Property, Task, TaskWithClient, TeamMember } from './types'
+import type { Client360, ClientWithHealth, ClosingData, Disposition, Note, Property, Task, TaskWithClient, TeamMember } from './types'
 
 export async function searchProperties(
   supabase: SupabaseClient,
@@ -104,4 +104,38 @@ export async function fetchTasks(supabase: SupabaseClient): Promise<TaskWithClie
     .order('due_date', { ascending: true })
   if (error) throw new Error(`Couldn't load tasks: ${error.message}`)
   return data as TaskWithClient[]
+}
+
+export interface ReceivableRow {
+  property_id: string
+  resort_name: string
+  client_id: string
+  client_name: string
+  resort_settlement: number | null
+  invoiced: number | null
+  disposition: Disposition | null
+  team_member_id: string | null
+  team_member_name: string | null
+  is_issued: boolean
+}
+
+export async function fetchReceivables(supabase: SupabaseClient): Promise<ReceivableRow[]> {
+  const { data, error } = await supabase
+    .from('closing_data')
+    .select('*, properties!inner(resort_name, client_id), clients!inner(name), team_members(name)')
+    .not('resort_settlement', 'is', null)
+    .order('resort_settlement', { ascending: false })
+  if (error) throw new Error(`Couldn't load receivables: ${error.message}`)
+  return (data as Array<Record<string, unknown> & { properties: { resort_name: string; client_id: string }; clients: { name: string }; team_members: { name: string } | null }>).map((row) => ({
+    property_id: row.property_id as string,
+    resort_name: row.properties.resort_name,
+    client_id: row.properties.client_id,
+    client_name: row.clients.name,
+    resort_settlement: row.resort_settlement as number | null,
+    invoiced: row.invoiced as number | null,
+    disposition: row.disposition as Disposition | null,
+    team_member_id: row.team_member_id as string | null,
+    team_member_name: row.team_members?.name ?? null,
+    is_issued: row.is_issued as boolean,
+  }))
 }

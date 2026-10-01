@@ -86,6 +86,7 @@ export interface ClosingData {
   invoiced: number | null
   disposition: Disposition | null
   team_member_id: string | null
+  is_issued: boolean
   updated_at: string
   team_members: { name: string } | null
 }
