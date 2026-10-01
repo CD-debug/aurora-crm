@@ -202,14 +202,17 @@ export function DashboardView({ data }: { data: DashboardData }) {
                     </Link>
                   ))}
                   {unresponsiveData.count > 0 && (
-                    <div className="flex items-center gap-2.5 rounded-md px-2 py-1.5 -mx-2">
+                    <Link
+                      href="/clients?stage=unresponsive"
+                      className="flex items-center gap-2.5 rounded-md px-2 py-1.5 -mx-2 hover:bg-muted/40 transition-colors group"
+                    >
                       <div className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: unresponsiveData.color }} />
-                      <span className="text-sm font-medium text-muted-foreground">{unresponsiveData.label}</span>
+                      <span className="text-sm font-medium text-muted-foreground group-hover:text-foreground transition-colors">{unresponsiveData.label}</span>
                       <span className="ml-auto text-sm font-mono tabular-nums text-muted-foreground">
                         {data.total_cases > 0 ? `${Math.round((unresponsiveData.count / data.total_cases) * 100)}%` : '0%'}
                       </span>
                       <span className="text-sm font-mono tabular-nums w-8 text-right">{unresponsiveData.count}</span>
-                    </div>
+                    </Link>
                   )}
                 </div>
               </>
