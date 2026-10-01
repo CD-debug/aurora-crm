@@ -70,7 +70,7 @@ export async function fetchClient360(supabase: SupabaseClient, clientId: string)
   const [clientRes, propsRes, closingRes, notesRes, tasksRes] = await Promise.all([
     supabase.from('clients_with_health').select('*').eq('id', clientId).single(),
     supabase.from('properties').select('*').eq('client_id', clientId).order('created_at', { ascending: true }),
-    supabase.from('closing_data').select('*'),
+    supabase.from('closing_data').select('*, team_members(name)'),
     supabase.from('notes').select('*, team_members(name)').eq('client_id', clientId).order('pinned', { ascending: false }).order('created_at', { ascending: false }),
     supabase.from('tasks').select('*, team_members(name)').eq('client_id', clientId).order('due_date', { ascending: true }),
   ])

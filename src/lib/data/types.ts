@@ -81,7 +81,9 @@ export interface ClosingData {
   resort_settlement: number | null
   invoiced: number | null
   disposition: Disposition | null
+  team_member_id: string | null
   updated_at: string
+  team_members: { name: string } | null
 }
 
 export interface Note {

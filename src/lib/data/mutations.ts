@@ -203,6 +203,7 @@ const closingInput = z.object({
   resort_settlement: money,
   invoiced: money,
   disposition: z.enum(['Sent', 'Collected', 'Settled', 'Paid']).nullable().optional(),
+  team_member_id: z.string().uuid().nullable().optional(),
 })
 
 export async function saveClosingData(propertyId: string, clientId: string, input: z.input<typeof closingInput>) {

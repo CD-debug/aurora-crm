@@ -249,11 +249,12 @@ export default function Client360Page() {
   // --- Closing data ------------------------------------------------------------
   const [closingSheetOpen, setClosingSheetOpen] = useState(false)
 
-  const handleSaveClosing = async (propertyId: string, closingFields: { resort_settlement: string; invoiced: string; disposition: Disposition | null }) => {
+  const handleSaveClosing = async (propertyId: string, closingFields: { resort_settlement: string; invoiced: string; disposition: Disposition | null; team_member_id: string | null }) => {
     await saveClosingData(propertyId, clientId, {
       resort_settlement: closingFields.resort_settlement ? Number(closingFields.resort_settlement.replace(/,/g, '')) : null,
       invoiced: closingFields.invoiced ? Number(closingFields.invoiced.replace(/,/g, '')) : null,
       disposition: closingFields.disposition,
+      team_member_id: closingFields.team_member_id,
     })
     await invalidateAfterMutation(queryClient, clientId)
   }
@@ -968,6 +969,7 @@ export default function Client360Page() {
                 onOpenChange={setClosingSheetOpen}
                 properties={properties}
                 closingData={data?.closingData ?? []}
+                teamMembers={teamMembers}
                 onSave={handleSaveClosing}
               />
 

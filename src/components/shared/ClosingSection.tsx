@@ -41,6 +41,7 @@ export function ClosingSection({ properties, closingData, onEdit }: ClosingSecti
                   <th className="text-right p-3 font-medium">Resort Settlement</th>
                   <th className="text-right p-3 font-medium">Invoiced</th>
                   <th className="text-left p-3 font-medium">Disposition</th>
+                  <th className="text-left p-3 font-medium">Team Member</th>
                 </tr>
               </thead>
               <tbody>
@@ -52,6 +53,7 @@ export function ClosingSection({ properties, closingData, onEdit }: ClosingSecti
                       <td className="p-3 text-right font-mono tabular-nums">{formatCurrency(cd?.resort_settlement ?? null)}</td>
                       <td className="p-3 text-right font-mono tabular-nums">{formatCurrency(cd?.invoiced ?? null)}</td>
                       <td className="p-3">{cd?.disposition ?? '—'}</td>
+                      <td className="p-3">{cd?.team_members?.name ?? '—'}</td>
                     </tr>
                   )
                 })}

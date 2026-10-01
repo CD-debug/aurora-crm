@@ -12,16 +12,17 @@ interface ClosingEditSheetProps {
   onOpenChange: (open: boolean) => void
   properties: Property[]
   closingData: ClosingData[]
-  onSave: (propertyId: string, data: { resort_settlement: string; invoiced: string; disposition: Disposition | null }) => Promise<void>
+  teamMembers: Array<{ id: string; name: string }>
+  onSave: (propertyId: string, data: { resort_settlement: string; invoiced: string; disposition: Disposition | null; team_member_id: string | null }) => Promise<void>
 }
 
 const DISPOSITIONS: Disposition[] = ['Sent', 'Collected', 'Settled', 'Paid']
 
-export function ClosingEditSheet({ open, onOpenChange, properties, closingData, onSave }: ClosingEditSheetProps) {
+export function ClosingEditSheet({ open, onOpenChange, properties, closingData, teamMembers, onSave }: ClosingEditSheetProps) {
   const [saving, setSaving] = useState(false)
   const closingMap = new Map(closingData.map((cd) => [cd.property_id, cd]))
 
-  const [formData, setFormData] = useState<Record<string, { resort_settlement: string; invoiced: string; disposition: Disposition | null }>>({})
+  const [formData, setFormData] = useState<Record<string, { resort_settlement: string; invoiced: string; disposition: Disposition | null; team_member_id: string | null }>>({})
 
   const getField = (propertyId: string) => {
     if (formData[propertyId]) return formData[propertyId]
@@ -30,6 +31,7 @@ export function ClosingEditSheet({ open, onOpenChange, properties, closingData, 
       resort_settlement: cd?.resort_settlement != null ? String(cd.resort_settlement) : '',
       invoiced: cd?.invoiced != null ? String(cd.invoiced) : '',
       disposition: cd?.disposition ?? null,
+      team_member_id: cd?.team_member_id ?? null,
     }
   }
 
@@ -96,6 +98,22 @@ export function ClosingEditSheet({ open, onOpenChange, properties, closingData, 
                     <SelectContent>
                       {DISPOSITIONS.map((d) => (
                         <SelectItem key={d} value={d}>{d}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <label className="text-xs text-muted-foreground mb-1 block">Team Member</label>
+                  <Select
+                    value={data.team_member_id ?? ''}
+                    onValueChange={(v) => setField(p.id, 'team_member_id', v || null)}
+                  >
+                    <SelectTrigger className="w-[160px]">
+                      <SelectValue placeholder="Unassigned" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {teamMembers.map((m) => (
+                        <SelectItem key={m.id} value={m.id}>{m.name}</SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
