@@ -99,7 +99,6 @@ export function maintenanceProjection(properties: Property[]) {
   let grandTotal = 0
 
   for (const p of properties) {
-    if (p.status !== 'active') continue
     const annualFee = Number(p.maintenance_fee ?? 0)
     if (annualFee <= 0) continue
 
